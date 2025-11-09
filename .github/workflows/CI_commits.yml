@@ -9,16 +9,14 @@ name: Commits Syntax Checker
 on:
   # Trigger the workflow on every push to any branch
   push:
-  # Trigger the workflow on every pull request (opened, synchronized, or updated)
-  pull_request:
+    branches: [trunk]
 
 jobs:
   check:
     name: Conventional Commits
     runs-on: ubuntu-24.04
 
-    steps:
-      
+    steps:    
       # Step to validate commit messages following the Conventional Commits standard
       - name: Validate commit messages
         uses: webiny/action-conventional-commits@v1.3.0
