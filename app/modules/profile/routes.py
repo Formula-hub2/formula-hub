@@ -1,4 +1,9 @@
-from flask import redirect, render_template, request, url_for
+import base64
+from io import BytesIO
+
+import pyotp
+import qrcode
+from flask import flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app import db
@@ -53,3 +58,39 @@ def my_profile():
         pagination=user_datasets_pagination,
         total_datasets=total_datasets_count,
     )
+
+
+@profile_bp.route("/profile/enable_2fa", methods=["GET", "POST"])
+@login_required
+def enable_2fa():
+    user = current_user
+
+    # Si ya tiene 2FA activado, no permitir reactivar
+    if user.two_factor_enabled:
+        flash("2FA ya está activado")
+        return redirect(url_for("profile.edit_profile"))
+
+    # Solo generar secret si no lo tiene todavía
+    if not user.two_factor_secret:
+        user.two_factor_secret = pyotp.random_base32()
+        db.session.commit()
+
+    # Crear la URI y QR en base al secret existente
+    uri = pyotp.TOTP(user.two_factor_secret).provisioning_uri(name=user.email, issuer_name="FormulaHub")
+    img = qrcode.make(uri)
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    # Verificar el token enviado por el usuario
+    if request.method == "POST":
+        token = request.form.get("token")
+        if pyotp.TOTP(user.two_factor_secret).verify(token):
+            user.two_factor_enabled = True
+            db.session.commit()
+            flash("2FA activado correctamente", "success")
+            return redirect(url_for("profile.edit_profile"))
+        else:
+            flash("Código inválido, inténtalo de nuevo", "danger")
+
+    return render_template("profile/enable_2fa.html", qr_b64=qr_b64, secret=user.two_factor_secret)

@@ -76,3 +76,13 @@ class AuthenticationService(BaseService):
 
     def temp_folder_by_user(self, user: User) -> str:
         return os.path.join(uploads_folder_name(), "temp", str(user.id))
+
+    "Obtiene un usuario por su email utilizando el repositorio."
+
+    def get_user_by_email(self, email: str) -> User | None:
+        return self.repository.get_by_email(email)
+
+    "Verifica si la contraseña proporcionada es correcta."
+
+    def verify_password(self, user: User, password: str) -> bool:
+        return user.check_password(password)

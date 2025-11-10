@@ -1,0 +1,14 @@
+{% extends "base_template.html" %}
+
+{% block content %}
+<h2>Habilitar Autenticación en Dos Pasos (2FA)</h2>
+<p>Escanea este código con tu app de autenticación (Google Authenticator, Authy, etc.):</p>
+<img src="data:image/png;base64,{{ qr_b64 }}" alt="QR 2FA" />
+<p>O introduce manualmente esta clave: <strong>{{ secret }}</strong></p>
+
+<form method="post">
+    <label>Introduce el código generado por tu app:</label>
+    <input type="text" name="token" maxlength="6" required>
+    <button type="submit">Confirmar</button>
+</form>
+{% endblock %}

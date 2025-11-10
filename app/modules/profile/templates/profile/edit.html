@@ -98,6 +98,19 @@
 
 
                 </div>
+
+                <div class="row form-group mt-3">
+                    <div class="col-12">
+                        {% if not current_user.two_factor_enabled %}
+                            <a href="{{ url_for('profile.enable_2fa') }}" class="btn btn-warning">
+                                Activar 2FA
+                            </a>
+                        {% else %}
+                            <span class="text-success">2FA está activado</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
             </form>
 
 

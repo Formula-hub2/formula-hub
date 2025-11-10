@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+import pyotp
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -34,3 +35,14 @@ class User(db.Model, UserMixin):
         from app.modules.auth.services import AuthenticationService
 
         return AuthenticationService().temp_folder_by_user(self)
+
+    # --- Campos para 2FA ---
+    two_factor_enabled = db.Column(db.Boolean, default=False)
+    two_factor_secret = db.Column(db.String(32), nullable=True)
+
+    # --- Método para verificar TOTP ---
+    def verify_totp(self, token):
+        if not self.two_factor_enabled or not self.two_factor_secret:
+            return False
+        totp = pyotp.TOTP(self.two_factor_secret)
+        return totp.verify(token, valid_window=1)
