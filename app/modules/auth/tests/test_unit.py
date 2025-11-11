@@ -1,6 +1,8 @@
+import pyotp
 import pytest
-from flask import url_for
+from flask import session, url_for
 
+from app import db
 from app.modules.auth.repositories import UserRepository
 from app.modules.auth.services import AuthenticationService
 from app.modules.profile.repositories import UserProfileRepository
@@ -102,3 +104,37 @@ def test_service_create_with_profile_fail_no_password(clean_database):
 
     assert UserRepository().count() == 0
     assert UserProfileRepository().count() == 0
+
+
+def test_2fa_verify_flow(clean_database, test_client):
+    # Crear usuario con 2FA activado
+    user_data = {"name": "2FA", "surname": "Tester", "email": "2fa@example.com", "password": "1234"}
+    AuthenticationService().create_with_profile(**user_data)
+
+    # Obtener el usuario de la DB
+    user_repo = UserRepository()
+    user = user_repo.get_by_email("2fa@example.com")
+    assert user is not None
+
+    # Activar 2FA y generar secret
+    import pyotp
+
+    secret = pyotp.random_base32()
+    user.two_factor_secret = secret
+    user.two_factor_enabled = True
+    db.session.commit()
+
+    # Simular login que requiere 2FA
+    with test_client.session_transaction() as sess:
+        sess["two_factor_user_id"] = user.id
+
+    # Generar token TOTP correcto
+    token = pyotp.TOTP(secret).now()
+
+    # POST a /verify_2fa
+    response = test_client.post("/verify_2fa", data={"token": token}, follow_redirects=True)
+    assert response.status_code == 200
+
+    # Verificar que la sesión quedó limpia
+    with test_client.session_transaction() as sess:
+        assert "two_factor_user_id" not in sess
