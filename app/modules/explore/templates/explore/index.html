@@ -172,6 +172,11 @@
             
             <form id="create-dataset-form">
                 <div class="modal-body">
+                    {% if csrf_token %}
+                    <input type="hidden" id="csrf_token" name="csrf_token" value="{{ csrf_token() }}">
+                    {% else %}
+                    <input type="hidden" id="csrf_token" name="csrf_token" value="">
+                    {% endif %}
                     
                     <div class="mb-3 row">
                         <label for="dataset-title" class="col-sm-4 col-form-label">Dataset Title</label>
@@ -188,12 +193,39 @@
                     </div>
 
                     <div class="mb-3 row">
+                        <label for="dataset-publication-type" class="col-sm-4 col-form-label">Publication Type</label>
+                        <div class="col-sm-8">
+                            <select class="form-control" id="dataset-publication-type" name="publication_type" required>
+                                <option value="none">None</option>
+                                <option value="annotationcollection">Annotation Collection</option>
+                                <option value="book">Book</option>
+                                <option value="section">Book Section</option>
+                                <option value="conferencepaper">Conference Paper</option>
+                                <option value="datamanagementplan">Data Management Plan</option>
+                                <option value="article">Journal Article</option>
+                                <option value="patent">Patent</option>
+                                <option value="preprint">Preprint</option>
+                                <option value="deliverable">Project Deliverable</option>
+                                <option value="milestone">Project Milestone</option>
+                                <option value="proposal">Proposal</option>
+                                <option value="report">Report</option>
+                                <option value="softwaredocumentation">Software Documentation</option>
+                                <option value="taxonomictreatment">Taxonomic Treatment</option>
+                                <option value="technicalnote">Technical Note</option>
+                                <option value="thesis">Thesis</option>
+                                <option value="workingpaper">Working Paper</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 row">
                         <label for="dataset-tags" class="col-sm-4 col-form-label">Tags</label>
                         <div class="col-sm-8">
                             <input type="text" class="form-control" id="dataset-tags">
                         </div>
                     </div>
-
+                    
                     <div class="mb-3 row align-items-center">
                         <label class="col-sm-4 col-form-label">Upload Files</label>
                         <div class="col-sm-8 d-flex justify-content-end">

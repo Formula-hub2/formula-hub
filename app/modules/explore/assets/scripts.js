@@ -58,7 +58,7 @@ function send_query() {
                             <div class="card">
                                 <div class="card-body">
                                     <div class="d-flex align-items-center justify-content-between">
-                                        <h3><a href="${dataset.url}">${dataset.title}</a></h3>
+                                        <h3><a href="${dataset.dataset_doi ? dataset.url : '/dataset/view/' + dataset.id}">${dataset.title}</a></h3>
                                         <div>
                                             <span class="badge bg-primary" style="cursor: pointer;" onclick="set_publication_type_as_query('${dataset.publication_type}')">${dataset.publication_type}</span>
                                         </div>
@@ -129,10 +129,7 @@ function send_query() {
                                                 Add to my dataset
                                             </button>
                                         </div>
-
-
                                     </div>
-
                                 </div>
                             </div>
                         `;
@@ -140,9 +137,9 @@ function send_query() {
                         document.getElementById('results').appendChild(card);
 
                         // Conecta el Add to my datasets con el carrito
-                        const addBtnEl = document.getElementById(`add-btn-${dataset.id}`);
-                        if (addBtnEl) {
-                            addBtnEl.addEventListener('click', () => {
+                        const addBtn = document.getElementById(`add-btn-${dataset.id}`);
+                        if (addBtn) {
+                            addBtn.addEventListener('click', () => {
                                 addDatasetToSelection(dataset.id, dataset.title);
                             });
                         }
@@ -338,4 +335,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // EL carrito inicia sin datasets seleccionados
     updateSelectedDatasetsUI();
+
+    document.getElementById('create-dataset-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        const selectedDatasetIds = Array.from(selectedDatasets.keys()).join(',');
+        
+        formData.append('title', document.getElementById('dataset-title').value);
+        formData.append('description', document.getElementById('dataset-description').value);
+        formData.append('publication_type', document.getElementById('dataset-publication-type').value);
+        formData.append('tags', document.getElementById('dataset-tags').value);
+        formData.append('selected_datasets', selectedDatasetIds);
+        formData.append('csrf_token', document.getElementById('csrf_token').value);
+        
+        // Maneja archivos si hay
+        const fileInput = document.getElementById('dataset-files');
+        if (fileInput.files.length > 0) {
+            for (let i = 0; i < fileInput.files.length; i++) {
+                formData.append('files', fileInput.files[i]);
+            }
+        }
+
+        fetch('/explore/create-dataset-from-cart', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Vacia el carrito
+                selectedDatasets.clear();
+                updateSelectedDatasetsUI();
+                
+                // Cierra el modal
+                closeModalOnly();
+                
+                const queryInput = document.getElementById('query');
+                queryInput.dispatchEvent(new Event('input', {bubbles: true}));
+
+            } else {
+                alert('Error creating dataset: ' + data.message);
+            }
+        })
+    });
+
+    // Botón de Browse Files
+    document.querySelector('button[style*="background-color: #69a7d6"]').addEventListener('click', function() {
+        document.getElementById('dataset-files').click();
+    });
 });

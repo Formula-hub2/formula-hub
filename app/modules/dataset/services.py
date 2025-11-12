@@ -8,7 +8,7 @@ from typing import Optional
 from flask import request
 
 from app.modules.auth.services import AuthenticationService
-from app.modules.dataset.models import DataSet, DSMetaData, DSViewRecord
+from app.modules.dataset.models import DataSet, DSMetaData, DSViewRecord, PublicationType
 from app.modules.dataset.repositories import (
     AuthorRepository,
     DataSetRepository,
@@ -139,7 +139,139 @@ class DataSetService(BaseService):
     def get_uvlhub_doi(self, dataset: DataSet) -> str:
         domain = os.getenv("DOMAIN", "localhost")
         return f"http://{domain}/doi/{dataset.ds_meta_data.dataset_doi}"
+    
+    def create_combined_dataset(self, current_user, title, description, publication_type, tags, source_dataset_ids):
+        """Crea un nuevo dataset combinando modelos de datasets existentes"""
+    
+        logger.info(f"Creating combined dataset: {title}")
+        
+        main_author = {
+            "name": f"{current_user.profile.surname}, {current_user.profile.name}",
+            "affiliation": current_user.profile.affiliation,
+            "orcid": current_user.profile.orcid,
+        }
+        
+        try:
+            # Convertir publication_type string a enum
+            publication_type_enum = PublicationType.NONE
+            if publication_type and publication_type != "any":
+                for pt in PublicationType:
+                    if pt.value == publication_type:
+                        publication_type_enum = pt
+                        break
+            
+            # Crear metadata del dataset
+            dsmetadata_data = {
+                "title": title,
+                "description": description,
+                "publication_type": publication_type_enum,
+                "publication_doi": None,
+                "dataset_doi": None,
+                "deposition_id": None,
+                "tags": tags
+            }
+            
 
+            dsmetadata = self.dsmetadata_repository.create(**dsmetadata_data)
+            
+            # Añadir autor principal
+            author = self.author_repository.create(
+                commit=False, 
+                ds_meta_data_id=dsmetadata.id, 
+                **main_author
+            )
+            dsmetadata.authors.append(author)
+            
+            # Crear el dataset
+            dataset = self.create(commit=False, user_id=current_user.id, ds_meta_data_id=dsmetadata.id)
+            
+            # Crear directorio para el nuevo dataset
+            working_dir = os.getenv("WORKING_DIR", "")
+            new_dataset_dir = os.path.join(working_dir, "uploads", f"user_{current_user.id}", f"dataset_{dataset.id}")
+            os.makedirs(new_dataset_dir, exist_ok=True)
+            
+            # Copiar feature models de los datasets seleccionados
+            feature_models_copied = 0
+            for source_dataset_id in source_dataset_ids:
+                source_dataset = self.get_or_404(source_dataset_id)
+                
+                # Obtener directorio del dataset fuente
+                source_dataset_dir = os.path.join(working_dir, "uploads", f"user_{source_dataset.user_id}", f"dataset_{source_dataset.id}")
+                
+                for feature_model in source_dataset.feature_models:
+                    
+                    # Crear nueva metadata para el feature model
+                    fmmetadata_data = {
+                        "uvl_filename": feature_model.fm_meta_data.uvl_filename,
+                        "title": feature_model.fm_meta_data.title or feature_model.fm_meta_data.uvl_filename,
+                        "description": feature_model.fm_meta_data.description or "",
+                        "publication_type": feature_model.fm_meta_data.publication_type or PublicationType.NONE,
+                        "publication_doi": feature_model.fm_meta_data.publication_doi,
+                        "tags": feature_model.fm_meta_data.tags,
+                        "uvl_version": feature_model.fm_meta_data.uvl_version or "1.0",
+                    }
+                    
+                    fmmetadata = self.fmmetadata_repository.create(commit=False, **fmmetadata_data)
+                
+                    # Copiar autores del feature model original
+                    for original_author in feature_model.fm_meta_data.authors:
+                        author_data = original_author.to_dict()
+                        author = self.author_repository.create(
+                            commit=False, 
+                            fm_meta_data_id=fmmetadata.id, 
+                            **author_data
+                        )
+                        fmmetadata.authors.append(author)
+                    
+                    # Crear el feature model en el nuevo dataset
+                    fm = self.feature_model_repository.create(
+                        commit=False, 
+                        data_set_id=dataset.id, 
+                        fm_meta_data_id=fmmetadata.id
+                    )
+                    
+                    # COPIAR LOS ARCHIVOS uvl
+                    files_copied = 0
+                    for file in feature_model.files:
+                        # Ruta del archivo original
+                        source_file_path = os.path.join(source_dataset_dir, file.name)
+                        
+                        # Ruta del archivo destino
+                        dest_file_path = os.path.join(new_dataset_dir, file.name)
+                        
+                        # Verificar que el archivo fuente existe
+                        if os.path.exists(source_file_path):
+                            # Copiar el archivo
+                            shutil.copy2(source_file_path, dest_file_path)
+                            
+                            # Recalcular checksum y tamaño del archivo copiado
+                            new_checksum, new_size = calculate_checksum_and_size(dest_file_path)
+                            
+                            # Crear registro del archivo con los nuevos datos
+                            new_file = self.hubfilerepository.create(
+                                commit=False, 
+                                name=file.name, 
+                                checksum=new_checksum, 
+                                size=new_size, 
+                                feature_model_id=fm.id
+                            )
+                            fm.files.append(new_file)
+                            files_copied += 1
+                        else:
+                            logger.error(f"Source file not found: {source_file_path}")
+                    
+                    feature_models_copied += 1
+            
+            logger.info(f"Total feature models copied: {feature_models_copied}")
+            
+            # Hacer commit final
+            self.repository.session.commit()
+            return dataset
+            
+        except Exception as exc:
+            logger.error(f"=== ERROR in create_combined_dataset ===")
+            self.repository.session.rollback()
+            raise exc
 
 class AuthorService(BaseService):
     def __init__(self):
