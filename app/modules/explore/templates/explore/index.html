@@ -154,7 +154,9 @@
                     No datasets selected yet.
                 </li>
             </ul>
-
+            <button id="open-download-modal-btn" class="btn btn-success w-100 mb-2" disabled>
+                <i data-feather="download"></i> Download models
+            </button>
             <button id="create-dataset-btn" class="btn btn-info w-100" disabled>
                 Create my own dataset
             </button>
@@ -255,6 +257,24 @@
             </form>
         </div>
     </div>
+</div>
+
+<div id="download-dataset-modal" class="modal" tabindex="-1" style="display: none;">
+    <div class="modal-dialog modal-md"><div class="modal-content">
+        <div class="modal-header">
+            <h5 class="modal-title">Download Datasets</h5>
+            <button type="button" class="btn-close btn-close-white" id="download-modal-close-btn"></button>
+        </div>
+        <form id="download-dataset-form">
+            <div class="modal-body">
+                <p class="text-secondary">Enter filename:</p>
+                <div class="mb-3"><input type="text" class="form-control" id="zip-filename" placeholder="models" required></div>
+            </div>
+            <div class="modal-footer d-block text-center p-4"> 
+                <button type="submit" class="btn btn-success btn-lg create-btn-custom-width">Download .zip</button>
+            </div>
+        </form>
+    </div></div>
 </div>
 
 <style>

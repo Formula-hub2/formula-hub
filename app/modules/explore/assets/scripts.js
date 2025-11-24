@@ -180,6 +180,7 @@ function updateSelectedDatasetsUI() {
     const list = document.getElementById('selected-datasets-list');
     const badge = document.getElementById('cart-count-badge');
     const createBtn = document.getElementById('create-dataset-btn');
+    const downloadBtn = document.getElementById('open-download-modal-btn');
     const hiddenInput = document.getElementById('selected-dataset-ids');
     const sidebarBadge = document.getElementById('dataset-sidebar-count');
 
@@ -194,6 +195,7 @@ function updateSelectedDatasetsUI() {
         empty.textContent = 'No datasets selected yet.';
         list.appendChild(empty);
         createBtn.disabled = true;
+        if(downloadBtn) downloadBtn.disabled = true;
     } else {
         selectedDatasets.forEach((title, id) => {
             const li = document.createElement('li');
@@ -216,6 +218,7 @@ function updateSelectedDatasetsUI() {
         });
 
         createBtn.disabled = false;
+        if(downloadBtn) downloadBtn.disabled = false;
     }
 
     badge.textContent = selectedDatasets.size;
@@ -384,4 +387,43 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('button[style*="background-color: #69a7d6"]').addEventListener('click', function() {
         document.getElementById('dataset-files').click();
     });
+});
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    const dModal = document.getElementById('download-dataset-modal');
+    const dOpenBtn = document.getElementById('open-download-modal-btn');
+    const dCloseBtn = document.getElementById('download-modal-close-btn');
+    const dForm = document.getElementById('download-dataset-form');
+
+    if(dOpenBtn) dOpenBtn.onclick = () => dModal.style.display = 'flex';
+    if(dCloseBtn) dCloseBtn.onclick = () => dModal.style.display = 'none';
+
+    if(dForm) {
+        dForm.onsubmit = function(e) {
+            e.preventDefault();
+            let filename = document.getElementById('zip-filename').value || "models";
+            dModal.style.display = 'none';
+            
+            const csrfToken = document.getElementById('csrf_token').value;
+            const datasetIds = Array.from(selectedDatasets.keys()).map(id => parseInt(id));
+
+            fetch('/explore/download_cart', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ dataset_ids: datasetIds, filename: filename })
+            })
+            .then(res => res.ok ? res.blob() : res.text().then(t => { throw new Error(t) }))
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename.endsWith('.zip') ? filename : filename + '.zip';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            })
+            .catch(err => alert('Error downloading.'));
+        };
+    }
 });
