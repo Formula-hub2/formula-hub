@@ -13,7 +13,8 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
-    
+    runs-on: ubuntu-24.04
+
     steps:
       # 1. Disparar el despliegue en Render
       - name: Trigger Deployment Webhook
