@@ -1,32 +1,23 @@
-# ----------------------------------------------------------------------------
-# Deploy on Webhook Workflow
-# This workflow triggers a deployment webhook only after the "Pytest"
-# workflow has successfully completed on the main branch.
-# ----------------------------------------------------------------------------
-
 name: Deploy on Webhook
 
 on:
   workflow_run:
-    # Trigger this workflow only after "Pytest" completes
-    workflows: 
-      - "Pytest"
+    workflows: ["Pytest"]
     types:
       - completed
 
 jobs:
   deploy:
-    # MODIFICADO: Despliega solo si Pytest tuvo éxito Y
-    # el evento que disparó Pytest fue un PUSH a TRUNK.
+    runs-on: ubuntu-24.04
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'trunk'
-    runs-on: ubuntu-24.04
-
+      github.event.workflow_run.head_branch == 'main'
+    
     steps:
-      # Step: Trigger the external deployment webhook
+      # 1. Disparar el despliegue en Render
       - name: Trigger Deployment Webhook
+        id: deploy_trigger # Le ponemos ID para saber si falló
         env:
           WEBHOOK_DOMAIN: ${{ secrets.WEBHOOK_DOMAIN }}
           WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
@@ -34,3 +25,21 @@ jobs:
           curl -X POST \
             https://${{ secrets.WEBHOOK_DOMAIN }}/webhook/deploy \
             -H "Authorization: Bearer ${{ secrets.WEBHOOK_TOKEN }}"
+
+      # 2. Notificar ÉXITO a Discord
+      - name: Discord Notification - Success
+        if: success() # Solo si el paso anterior (curl) funcionó
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        with:
+          args: '🚀 **Formula Hub Desplegado!** La nueva versión en `main` se ha enviado a Render correctamente.'
+
+      # 3. Notificar FALLO a Discord (Opcional pero recomendado)
+      - name: Discord Notification - Failure
+        if: failure() # Solo si el curl falló
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        with:
+          args: '🚨 **Error en Despliegue:** No se pudo contactar con Render para actualizar UVLHub.'
