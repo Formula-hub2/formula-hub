@@ -41,6 +41,8 @@ def upgrade():
     sa.Column('email', sa.String(length=256), nullable=False),
     sa.Column('password', sa.String(length=256), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('two_factor_enabled', sa.Boolean(), nullable=True),
+    sa.Column('two_factor_secret', sa.String(length=32), nullable=True),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email')
     )
@@ -183,7 +185,7 @@ def downgrade():
     op.drop_table('fm_meta_data')
     op.drop_table('ds_meta_data')
     op.drop_table('zenodo')
-    op.drop_table('webhook')
+    # op.drop_table('webhook')
     op.drop_table('user')
     op.drop_table('fm_metrics')
     op.drop_table('ds_metrics')
