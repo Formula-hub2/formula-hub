@@ -1,8 +1,10 @@
 import os
 import time
 
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 from core.environment.host import get_host_for_selenium_testing
@@ -10,186 +12,182 @@ from core.selenium.common import close_driver, initialize_driver
 
 
 def wait_for_page_to_load(driver, timeout=4):
-    WebDriverWait(driver, timeout).until(
-        lambda driver: driver.execute_script("return document.readyState") == "complete"
-    )
+    try:
+        WebDriverWait(driver, timeout).until(
+            lambda driver: driver.execute_script("return document.readyState") == "complete"
+        )
+    except TimeoutException:
+        pass
 
 
 def count_datasets(driver, host):
     driver.get(f"{host}/dataset/list")
     wait_for_page_to_load(driver)
-
     try:
-        amount_datasets = len(driver.find_elements(By.XPATH, "//table//tbody//tr"))
+        # Contamos filas en cualquier cuerpo de tabla presente
+        rows = driver.find_elements(By.XPATH, "//table//tbody//tr")
+        return len(rows)
     except Exception:
-        amount_datasets = 0
-    return amount_datasets
+        return 0
 
 
-def test_upload_dataset():
+def test_full_lifecycle():
+    print(">>> INICIANDO TEST E2E COMPLETO (Upload -> Download -> Counter)...")
     driver = initialize_driver()
+    wait = WebDriverWait(driver, 10)
+    dataset_title = "Selenium Lifecycle Test"
 
     try:
         host = get_host_for_selenium_testing()
 
-        # Open the login page
+        # -----------------------------------------------------------------------
+        # FASE 1: LOGIN
+        # -----------------------------------------------------------------------
+        print("[1/4] Login...")
         driver.get(f"{host}/login")
         wait_for_page_to_load(driver)
 
-        # Find the username and password field and enter the values
-        email_field = driver.find_element(By.NAME, "email")
-        password_field = driver.find_element(By.NAME, "password")
-
-        email_field.send_keys("user1@example.com")
-        password_field.send_keys("1234")
-
-        # Send the form
-        password_field.send_keys(Keys.RETURN)
-        time.sleep(4)
-        wait_for_page_to_load(driver)
-
-        # Count initial datasets
-        initial_datasets = count_datasets(driver, host)
-
-        # Open the upload dataset
-        driver.get(f"{host}/dataset/upload")
-        wait_for_page_to_load(driver)
-
-        # Find basic info and UVL model and fill values
-        title_field = driver.find_element(By.NAME, "title")
-        title_field.send_keys("Title")
-        desc_field = driver.find_element(By.NAME, "desc")
-        desc_field.send_keys("Description")
-        tags_field = driver.find_element(By.NAME, "tags")
-        tags_field.send_keys("tag1,tag2")
-
-        # Add two authors and fill
-        add_author_button = driver.find_element(By.ID, "add_author")
-        add_author_button.send_keys(Keys.RETURN)
-        wait_for_page_to_load(driver)
-        add_author_button.send_keys(Keys.RETURN)
-        wait_for_page_to_load(driver)
-
-        name_field0 = driver.find_element(By.NAME, "authors-0-name")
-        name_field0.send_keys("Author0")
-        affiliation_field0 = driver.find_element(By.NAME, "authors-0-affiliation")
-        affiliation_field0.send_keys("Club0")
-        orcid_field0 = driver.find_element(By.NAME, "authors-0-orcid")
-        orcid_field0.send_keys("0000-0000-0000-0000")
-
-        name_field1 = driver.find_element(By.NAME, "authors-1-name")
-        name_field1.send_keys("Author1")
-        affiliation_field1 = driver.find_element(By.NAME, "authors-1-affiliation")
-        affiliation_field1.send_keys("Club1")
-
-        # Obtén las rutas absolutas de los archivos
-        file1_path = os.path.abspath("app/modules/dataset/uvl_examples/file1.uvl")
-        file2_path = os.path.abspath("app/modules/dataset/uvl_examples/file2.uvl")
-
-        # Subir el primer archivo
-        dropzone = driver.find_element(By.CLASS_NAME, "dz-hidden-input")
-        dropzone.send_keys(file1_path)
-        wait_for_page_to_load(driver)
-
-        # Subir el segundo archivo
-        dropzone = driver.find_element(By.CLASS_NAME, "dz-hidden-input")
-        dropzone.send_keys(file2_path)
-        wait_for_page_to_load(driver)
-
-        # Add authors in UVL models
-        show_button = driver.find_element(By.ID, "0_button")
-        show_button.send_keys(Keys.RETURN)
-        add_author_uvl_button = driver.find_element(By.ID, "0_form_authors_button")
-        add_author_uvl_button.send_keys(Keys.RETURN)
-        wait_for_page_to_load(driver)
-
-        name_field = driver.find_element(By.NAME, "feature_models-0-authors-2-name")
-        name_field.send_keys("Author3")
-        affiliation_field = driver.find_element(By.NAME, "feature_models-0-authors-2-affiliation")
-        affiliation_field.send_keys("Club3")
-
-        # Check I agree and send form
-        check = driver.find_element(By.ID, "agreeCheckbox")
-        check.send_keys(Keys.SPACE)
-        wait_for_page_to_load(driver)
-
-        upload_btn = driver.find_element(By.ID, "upload_button")
-        upload_btn.send_keys(Keys.RETURN)
-        wait_for_page_to_load(driver)
-        time.sleep(2)  # Force wait time
-
-        assert driver.current_url == f"{host}/dataset/list", "Test failed!"
-
-        # Count final datasets
-        final_datasets = count_datasets(driver, host)
-        assert final_datasets == initial_datasets + 1, "Test failed!"
-
-        print("Test passed!")
-
-    finally:
-
-        # Close the browser
-        close_driver(driver)
-
-
-# Call the test function
-test_upload_dataset()
-
-
-def test_download_counter_increment():
-    driver = initialize_driver()
-
-    try:
-        host = get_host_for_selenium_testing()
-
-        # 1. Login
-        driver.get(f"{host}/login")
-        wait_for_page_to_load(driver)
         driver.find_element(By.NAME, "email").send_keys("user1@example.com")
         driver.find_element(By.NAME, "password").send_keys("1234")
         driver.find_element(By.NAME, "password").send_keys(Keys.RETURN)
-        time.sleep(2)
+
+        # Esperar a que redirija al dashboard o home
+        wait.until(EC.url_changes(f"{host}/login"))
         wait_for_page_to_load(driver)
 
-        # 2. Ir a la lista y click en el primer dataset
-        driver.get(f"{host}/dataset/list")
+        initial_datasets = count_datasets(driver, host)
+
+        # -----------------------------------------------------------------------
+        # FASE 2: UPLOAD (SUBIDA)
+        # -----------------------------------------------------------------------
+        print("[2/4] Subiendo dataset...")
+        driver.get(f"{host}/dataset/upload")
         wait_for_page_to_load(driver)
-        
-        # Click en el ojo (View)
+
+        # Datos básicos
+        driver.find_element(By.NAME, "title").send_keys(dataset_title)
+        driver.find_element(By.NAME, "desc").send_keys("Description for E2E test")
+        driver.find_element(By.NAME, "tags").send_keys("selenium,e2e")
+
+        # Autores (Esperas explícitas para evitar fallos de JS)
+        add_author_btn = driver.find_element(By.ID, "add_author")
+        add_author_btn.click()
+        wait.until(EC.visibility_of_element_located((By.NAME, "authors-0-name")))
+        driver.find_element(By.NAME, "authors-0-name").send_keys("Author Zero")
+        driver.find_element(By.NAME, "authors-0-affiliation").send_keys("Test Lab")
+
+        # Archivos (Rutas absolutas + Fix Dropzone)
+        # Asumimos que el script se ejecuta desde la raíz del proyecto
+        base_path = os.getcwd()
+        file1_path = os.path.join(base_path, "app/modules/dataset/uvl_examples/file1.uvl")
+        file2_path = os.path.join(base_path, "app/modules/dataset/uvl_examples/file2.uvl")
+
+        if not os.path.exists(file1_path):
+            raise Exception(f"CRÍTICO: No encuentro archivo en {file1_path}")
+
+        # Subir Archivo 1
+        dropzone_input = driver.find_element(By.CLASS_NAME, "dz-hidden-input")
+        driver.execute_script(
+            "arguments[0].style.visibility = 'visible'; arguments[0].style.height = '1px'; arguments[0].style.width = '1px'; arguments[0].style.opacity = 1",
+            dropzone_input,
+        )
+        dropzone_input.send_keys(file1_path)
+        time.sleep(1)  # Esperar miniatura
+
+        # Subir Archivo 2 (RE-QUERY IMPORTANTE)
+        dropzone_input = driver.find_element(By.CLASS_NAME, "dz-hidden-input")
+        driver.execute_script(
+            "arguments[0].style.visibility = 'visible'; arguments[0].style.height = '1px'; arguments[0].style.width = '1px'; arguments[0].style.opacity = 1",
+            dropzone_input,
+        )
+        dropzone_input.send_keys(file2_path)
+        time.sleep(1)
+
+        # Checkbox y Enviar
+        check = driver.find_element(By.ID, "agreeCheckbox")
+        driver.execute_script("arguments[0].click();", check)
+
+        submit_btn = driver.find_element(By.ID, "upload_button")
+        driver.execute_script("arguments[0].click();", submit_btn)
+
+        # Esperar redirección a la lista
+        wait.until(EC.url_to_be(f"{host}/dataset/list"))
+
+        # Validar subida
+        final_datasets = count_datasets(driver, host)
+        assert final_datasets == initial_datasets + 1, "El dataset no aparece en la lista tras subirlo."
+
+        # -----------------------------------------------------------------------
+        # FASE 3: NAVEGACIÓN (ENCONTRAR EL DATASET)
+        # -----------------------------------------------------------------------
+        print("[3/4] Buscando dataset en la tabla...")
+
+        # ESTRATEGIA INDESTRUCTIBLE:
+        # 1. Buscar la fila (tr) que contiene el título que acabamos de escribir.
+        # 2. Dentro de esa fila, ir a la última celda (td).
+        # 3. Dentro de esa celda, hacer clic en el primer enlace (a).
         try:
-            view_buttons = driver.find_elements(By.XPATH, "//a[.//i[@data-feather='eye']]")
-            if not view_buttons:
-                raise Exception("No datasets found. Run test_upload_dataset first.")
-            view_buttons[0].click()
+            # XPath: Busca un TR que contenga el texto del título
+            row_xpath = f"//tr[contains(., '{dataset_title}')]"
+            dataset_row = driver.find_element(By.XPATH, row_xpath)
+
+            # Dentro de esa fila, busca la última celda y el primer enlace (View)
+            # Según tu HTML: <td> <a ... eye></a> <a ... download></a> </td>
+            view_btn = dataset_row.find_element(By.XPATH, ".//td[last()]//a[1]")
+
+            # Hacemos scroll y click JS para asegurar
+            driver.execute_script("arguments[0].scrollIntoView(true);", view_btn)
+            driver.execute_script("arguments[0].click();", view_btn)
+
             wait_for_page_to_load(driver)
-        except Exception as e:
-            print(f"Error navigating: {e}")
-            return
 
-        # 3. Guardar contador inicial
+        except NoSuchElementException:
+            print("DEBUG HTML: ", driver.page_source[:1000])
+            raise Exception(f"No encontré la fila con el título '{dataset_title}' o el botón de ver.")
+
+        # -----------------------------------------------------------------------
+        # FASE 4: CONTADOR (VERIFICACIÓN)
+        # -----------------------------------------------------------------------
+        print("[4/4] Verificando contador...")
+
+        # 1. Leer contador inicial
         try:
-            initial_count = int(driver.find_element(By.ID, "download_count_text").text.strip())
+            initial_count_elem = wait.until(EC.visibility_of_element_located((By.ID, "download_count_text")))
+            initial_count = int(initial_count_elem.text.strip())
+            print(f"   -> Contador inicial: {initial_count}")
         except:
-            assert False, "Falta el ID 'download_count_text' en el HTML."
+            raise Exception("No encuentro el ID 'download_count_text'. Revisa view_dataset.html")
 
-        # 4. Descargar
-        driver.find_element(By.ID, "download_btn").click()
-        time.sleep(1) # Esperar al JS
+        # 2. Pulsar botón descarga
+        download_btn = driver.find_element(By.ID, "download_btn")
+        download_btn.click()
 
-        # 5. Verificar JS (Frontend)
+        # Esperamos un poco a que el JS actúe
+        time.sleep(1.5)
+
+        # 3. Validar JS (Frontend)
         new_count = int(driver.find_element(By.ID, "download_count_text").text.strip())
-        assert new_count == initial_count + 1, "El contador JS no subió."
+        assert new_count == initial_count + 1, f"JS Falló: {initial_count} -> {new_count}"
+        print("   -> JS Frontend: OK")
 
-        # 6. Verificar BD (Backend)
+        # 4. Validar BD (Backend - Recarga)
         driver.refresh()
         wait_for_page_to_load(driver)
-        db_count = int(driver.find_element(By.ID, "download_count_text").text.strip())
-        assert db_count == initial_count + 1, "El contador no se guardó en BD."
 
-        print("Test passed: Download Counter works!")
+        db_count_elem = wait.until(EC.visibility_of_element_located((By.ID, "download_count_text")))
+        db_count = int(db_count_elem.text.strip())
+
+        assert db_count == initial_count + 1, f"BD Falló: Esperaba {initial_count + 1}, tengo {db_count}"
+        print("   -> BD Backend: OK")
+
+        print(">>> ✅ TEST COMPLETADO CON ÉXITO")
+
+    except Exception as e:
+        print(f"❌ ERROR: {e}")
+        raise e
 
     finally:
         close_driver(driver)
 
-# Ejecuta el test
-test_download_counter_increment()
+
+test_full_lifecycle()

@@ -32,14 +32,14 @@
                                 </td>
                                 <td>{{ dataset.ds_meta_data.description }}</td>
                                 <td>{{ dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
-                                <td>{{ dataset.download_count }}</td>
+                                <td class="js-download-count">{{ dataset.download_count }}</td>
                                 <td><a href="{{ dataset.get_uvlhub_doi() }}"
                                        target="_blank">{{ dataset.get_uvlhub_doi() }}</a></td>
                                 <td>
                                     <a href="{{ dataset.get_uvlhub_doi() }}">
                                         <i data-feather="eye"></i>
                                     </a>
-                                    <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}">
+                                    <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}" class="js-download-trigger">
                                         <i data-feather="download"></i>
                                     </a>
                                 </td>
@@ -100,12 +100,12 @@
                                         </td>
                                         <td>{{ local_dataset.ds_meta_data.description }}</td>
                                         <td>{{ local_dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
-                                        <td>{{ local_dataset.download_count }}</td>
+                                        <td class="js-download-count">{{ local_dataset.download_count }}</td>
                                         <td>
                                             <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}">
                                                 <i data-feather="eye"></i>
                                             </a>
-                                            <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}">
+                                            <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}" class="js-download-trigger">
                                                 <i data-feather="download"></i>
                                             </a>
                                         </td>
@@ -118,5 +118,40 @@
                 </div>
             {% endif %}
         </div>
+    </div>
 
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Aseguramos que Feather icons se carguen (si no lo hace el base template)
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+
+        const buttons = document.querySelectorAll('.js-download-trigger');
+
+        buttons.forEach(button => {
+            button.addEventListener('click', function() {
+                // 1. Subimos hasta encontrar la fila (tr) donde está este botón
+                const row = this.closest('tr');
+                
+                if (row) {
+                    // 2. Buscamos la celda del contador DENTRO de esa fila
+                    const countCell = row.querySelector('.js-download-count');
+                    
+                    if (countCell) {
+                        // 3. Magia matemática
+                        let currentCount = parseInt(countCell.innerText.trim());
+                        if (!isNaN(currentCount)) {
+                            countCell.innerText = currentCount + 1;
+                        }
+                    }
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}

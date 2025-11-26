@@ -92,11 +92,11 @@
                                     View dataset
                                 </a>
 
-                                <a href="/dataset/download/{{ dataset.id }}" class="btn btn-outline-primary btn-sm"
+                                <a href="/dataset/download/{{ dataset.id }}" class="btn btn-outline-primary btn-sm js-download-trigger"
                                    style="border-radius: 5px;">
                                     <i data-feather="download" class="center-button-icon"></i>
                                     Download ({{ dataset.get_file_total_size_for_human() }})
-                                    <span class="badge bg-secondary ms-1">{{ dataset.download_count }} downloads</span>
+                                    <span class="badge bg-secondary ms-1 js-download-badge">{{ dataset.download_count }} downloads</span>
                                 </a>
                             </div>
                         </div>
@@ -283,5 +283,35 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="{{ url_for('public.scripts') }}"></script>
+    <script src="{{ url_for('public.scripts') }}"></script> 
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Inicializar iconos Feather (ya lo tendrás en public.scripts, pero por si acaso)
+            if (typeof feather !== 'undefined') {
+                feather.replace();
+            }
+
+            // Seleccionamos TODOS los botones con la clase 'js-download-trigger'
+            const buttons = document.querySelectorAll('.js-download-trigger');
+
+            buttons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Buscamos el badge DENTRO del botón clickado
+                    const badge = this.querySelector('.js-download-badge');
+                    
+                    if (badge) {
+                        // Extraemos el número del texto (ej: "5 downloads" -> 5)
+                        const currentText = badge.innerText;
+                        const currentCount = parseInt(currentText);
+                        
+                        if (!isNaN(currentCount)) {
+                            // Actualizamos solo ese badge
+                            badge.innerText = (currentCount + 1) + " downloads";
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 {% endblock %}
