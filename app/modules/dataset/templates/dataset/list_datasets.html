@@ -17,6 +17,7 @@
                             <th>Title</th>
                             <th>Description</th>
                             <th>Publication type</th>
+                            <th>Downloads</th>
                             <th>Dataset DOI</th>
                             <th>Options</th>
                         </tr>
@@ -31,6 +32,7 @@
                                 </td>
                                 <td>{{ dataset.ds_meta_data.description }}</td>
                                 <td>{{ dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
+                                <td>{{ dataset.download_count }}</td>
                                 <td><a href="{{ dataset.get_uvlhub_doi() }}"
                                        target="_blank">{{ dataset.get_uvlhub_doi() }}</a></td>
                                 <td>
@@ -84,6 +86,7 @@
                                     <th>Title</th>
                                     <th>Description</th>
                                     <th>Publication type</th>
+                                    <th>Downloads</th>
                                     <th>Options</th>
                                 </tr>
                                 </thead>
@@ -97,6 +100,7 @@
                                         </td>
                                         <td>{{ local_dataset.ds_meta_data.description }}</td>
                                         <td>{{ local_dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
+                                        <td>{{ local_dataset.download_count }}</td>
                                         <td>
                                             <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}">
                                                 <i data-feather="eye"></i>

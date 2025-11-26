@@ -74,6 +74,8 @@ class DataSet(db.Model):
     ds_meta_data = db.relationship("DSMetaData", backref=db.backref("data_set", uselist=False))
     feature_models = db.relationship("FeatureModel", backref="data_set", lazy=True, cascade="all, delete")
 
+    download_count = db.Column(db.Integer, default=0, nullable=False)
+
     def name(self):
         return self.ds_meta_data.title
 
@@ -125,6 +127,7 @@ class DataSet(db.Model):
             "files_count": self.get_files_count(),
             "total_size_in_bytes": self.get_file_total_size(),
             "total_size_in_human_format": self.get_file_total_size_for_human(),
+            "download_count": self.download_count,
         }
 
     def __repr__(self):

@@ -107,6 +107,7 @@ def upgrade():
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('ds_meta_data_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
+    sa.Column('download_count', sa.Integer(), nullable=False,default = 0),
     sa.ForeignKeyConstraint(['ds_meta_data_id'], ['ds_meta_data.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')

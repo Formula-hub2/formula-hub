@@ -19,9 +19,10 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
+from app import db
 from app.modules.dataset import dataset_bp
 from app.modules.dataset.forms import DataSetForm
-from app.modules.dataset.models import DSDownloadRecord
+from app.modules.dataset.models import DataSet, DSDownloadRecord
 from app.modules.dataset.services import (
     AuthorService,
     DataSetService,
@@ -175,6 +176,9 @@ def delete():
 @dataset_bp.route("/dataset/download/<int:dataset_id>", methods=["GET"])
 def download_dataset(dataset_id):
     dataset = dataset_service.get_or_404(dataset_id)
+
+    dataset.download_count = DataSet.download_count + 1
+    db.session.commit()
 
     file_path = f"uploads/user_{dataset.user_id}/dataset_{dataset.id}/"
 
