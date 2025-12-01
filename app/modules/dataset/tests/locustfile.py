@@ -40,6 +40,14 @@ class DatasetBehavior(TaskSet):
                 "csrf_token": csrf_token,
             },
         )
+        self.client.post(
+            "/login",
+            data={
+                "email": "user1@example.com",
+                "password": "1234",  # O la password que tengas configurada
+                "csrf_token": csrf_token,
+            },
+        )
 
     def fetch_dataset_ids(self):
         # Ahora que estamos logueados, pedimos la lista
@@ -47,6 +55,8 @@ class DatasetBehavior(TaskSet):
 
         # Buscamos IDs. Tu URL puede ser /dataset/download/123 o /dataset/download/123/
         # Usamos una regex flexible
+        self.dataset_ids = re.findall(r"/dataset/download/(\d+)", response.text)
+
         self.dataset_ids = re.findall(r"/dataset/download/(\d+)", response.text)
 
         if not self.dataset_ids:
@@ -59,6 +69,7 @@ class DatasetBehavior(TaskSet):
         self.client.get("/dataset/upload")
 
     @task(3)
+    @task(3)
     def download_dataset(self):
         if not self.dataset_ids:
             return
@@ -70,5 +81,6 @@ class DatasetBehavior(TaskSet):
 
 class DatasetUser(HttpUser):
     tasks = [DatasetBehavior]
+    wait_time = between(1, 3)  # Más caña
     wait_time = between(1, 3)  # Más caña
     host = get_host_for_locust_testing()

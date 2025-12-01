@@ -46,9 +46,7 @@ def create_dataset_from_cart():
         selected_datasets = request.form.get("selected_datasets", "")
 
         # Convertir string de IDs a lista
-        source_dataset_ids = [
-            int(id.strip()) for id in selected_datasets.split(",") if id.strip()
-        ]
+        source_dataset_ids = [int(id.strip()) for id in selected_datasets.split(",") if id.strip()]
 
         created_dataset = dataset_service.create_combined_dataset(
             current_user=current_user,
@@ -68,9 +66,7 @@ def create_dataset_from_cart():
         )
 
     except Exception as e:
-        return jsonify(
-            {"success": False, "message": f"Error creating dataset: {str(e)}"}
-        ), 500
+        return jsonify({"success": False, "message": f"Error creating dataset: {str(e)}"}), 500
 
 
 @explore_bp.route("/explore/download_cart", methods=["POST"])
