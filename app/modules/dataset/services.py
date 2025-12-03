@@ -8,7 +8,7 @@ from typing import Optional
 from flask import request
 
 from app.modules.auth.services import AuthenticationService
-from app.modules.dataset.models import DataSet, DSMetaData, DSViewRecord, RawDataSet, UVLDataSet
+from app.modules.dataset.models import DataSet, DSMetaData, DSViewRecord, PublicationType, RawDataSet, UVLDataSet
 from app.modules.dataset.repositories import (
     AuthorRepository,
     DataSetRepository,
@@ -17,7 +17,9 @@ from app.modules.dataset.repositories import (
     DSMetaDataRepository,
     DSViewRecordRepository,
 )
+from app.modules.featuremodel.models import FeatureModel, FMMetaData
 from app.modules.featuremodel.repositories import FeatureModelRepository, FMMetaDataRepository
+from app.modules.hubfile.models import Hubfile
 from app.modules.hubfile.repositories import (
     HubfileRepository,
 )
@@ -77,6 +79,100 @@ class DataSetService(BaseService):
     def get_uvlhub_doi(self, dataset: DataSet) -> str:
         domain = os.getenv("DOMAIN", "localhost")
         return f"http://{domain}/doi/{dataset.ds_meta_data.dataset_doi}"
+
+    def create_combined_dataset(self, current_user, title, description, publication_type, tags, source_dataset_ids):
+        """
+        Crea un nuevo dataset combinando modelos de datasets existentes (carrito).
+        """
+
+        # 1. Convertir publication_type (string) a Enum
+        try:
+            pub_type_enum = PublicationType(publication_type)
+        except ValueError:
+            pub_type_enum = PublicationType.NONE
+
+        # 2. Crear metadatos del Dataset
+        ds_meta = self.dsmetadata_repository.create(
+            title=title, description=description, publication_type=pub_type_enum, tags=tags
+        )
+
+        # 3. Crear el Dataset (UVLDataSet para soportar feature models)
+        # Usamos create con commit=True para obtener el ID necesario para las carpetas
+        dataset = UVLDataSet(user_id=current_user.id, ds_meta_data_id=ds_meta.id)
+        self.repository.session.add(dataset)
+        self.repository.session.commit()
+
+        # 4. Preparar directorios
+        working_dir = os.getenv("WORKING_DIR", "")
+        dest_folder = os.path.join(working_dir, "uploads", f"user_{current_user.id}", f"dataset_{dataset.id}")
+        os.makedirs(dest_folder, exist_ok=True)
+
+        # 5. Iterar datasets fuente y clonar modelos
+        for source_id in source_dataset_ids:
+            source_ds = self.get_or_404(source_id)
+
+            # Solo procesamos si tiene modelos (es UVLDataSet)
+            if hasattr(source_ds, "feature_models"):
+                for original_fm in source_ds.feature_models:
+
+                    # A. Clonar FMMetaData
+                    original_meta = original_fm.fm_meta_data
+                    new_fm_meta = FMMetaData(
+                        uvl_filename=original_meta.uvl_filename,
+                        title=original_meta.title,
+                        description=original_meta.description,
+                        publication_type=original_meta.publication_type,
+                        publication_doi=original_meta.publication_doi,
+                        tags=original_meta.tags,
+                        uvl_version=original_meta.uvl_version,
+                    )
+                    self.repository.session.add(new_fm_meta)
+                    self.repository.session.commit()
+
+                    # B. Crear nuevo FeatureModel enlazado al nuevo Dataset
+                    new_fm = FeatureModel(data_set_id=dataset.id, fm_meta_data_id=new_fm_meta.id)
+                    self.repository.session.add(new_fm)
+                    self.repository.session.commit()
+
+                    # C. Clonar Archivos Físicos y crear registro Hubfile
+                    for original_file in original_fm.files:
+                        # Rutas
+                        source_path = os.path.join(
+                            working_dir,
+                            "uploads",
+                            f"user_{source_ds.user_id}",
+                            f"dataset_{source_ds.id}",
+                            original_file.name,
+                        )
+
+                        # Gestión de nombres duplicados
+                        dest_path = os.path.join(dest_folder, original_file.name)
+                        final_filename = original_file.name
+
+                        if os.path.exists(dest_path):
+                            name, ext = os.path.splitext(original_file.name)
+                            final_filename = f"{name}_{uuid.uuid4().hex[:4]}{ext}"
+                            dest_path = os.path.join(dest_folder, final_filename)
+                            # Actualizamos el nombre en metadatos también para mantener consistencia
+                            new_fm_meta.uvl_filename = final_filename
+
+                        # Copia física
+                        if os.path.exists(source_path):
+                            shutil.copy2(source_path, dest_path)
+
+                            # Registro en DB
+                            new_file = Hubfile(
+                                name=final_filename,
+                                checksum=original_file.checksum,
+                                size=original_file.size,
+                                feature_model_id=new_fm.id,
+                            )
+                            self.repository.session.add(new_file)
+                        else:
+                            logger.warning(f"File missing on disk: {source_path}")
+
+        self.repository.session.commit()
+        return dataset
 
 
 # === SERVICIO ESPECÍFICO UVL ===
