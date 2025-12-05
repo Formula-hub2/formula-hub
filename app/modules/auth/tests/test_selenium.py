@@ -123,4 +123,32 @@ def test_login_with_2fa_selenium():
             raise AssertionError("Test failed!")
 
     finally:
+        # TEARDOWN: Limpieza de la Base de Datos
+        print("🧹 [TEARDOWN] Iniciando limpieza...")
+
+        # Usamos un nuevo contexto para asegurar conexión limpia
+        try:
+            # Forzamos una nueva instancia de app para evitar sesiones cacheadas
+            cleanup_app = create_app()
+            with cleanup_app.app_context():
+                repo = UserRepository()
+                user_to_delete = repo.get_by_email("user3@example.com")
+
+                if user_to_delete:
+                    # A) Borrar sesiones activas primero (Evita IntegrityError)
+                    # Verifica si el modelo tiene la relación 'sessions'
+                    if hasattr(user_to_delete, "sessions") and user_to_delete.sessions:
+                        for session in user_to_delete.sessions:
+                            repo.session.delete(session)
+                        repo.session.commit()
+
+                    # B) Borrar el usuario
+                    repo.delete(user_to_delete.id)
+                    print(f"   - Usuario user3 (ID: {user_to_delete.id}) eliminado correctamente.")
+                else:
+                    print("   - El usuario user3 ya no existe.")
+
+        except Exception as e:
+            print(f"⚠️ [TEARDOWN ERROR] No se pudo limpiar la DB: {e}")
+
         close_driver(driver)
