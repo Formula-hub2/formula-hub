@@ -3,6 +3,9 @@ import os
 
 import click
 
+# 1. Obtenemos la ruta absoluta de ESTE archivo (cli.py)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 class RosemaryCLI(click.Group):
     def get_command(self, ctx, cmd_name):
@@ -23,7 +26,7 @@ def load_commands(cli_group, commands_dir="rosemary/commands"):
     """
     Dynamically import all commands in the specified directory and add them to the CLI group.
     """
-    commands_path = os.path.abspath(commands_dir)
+    commands_path = os.path.join(BASE_DIR, "commands")
     for file in os.listdir(commands_path):
         if file.endswith(".py") and not file.startswith("__"):
             module_name = f"rosemary.commands.{file[:-3]}"

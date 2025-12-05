@@ -118,8 +118,8 @@ function send_query() {
                                             <a href="/dataset/download/${dataset.id}" class="btn btn-outline-primary btn-sm" id="search" style="border-radius: 5px;">
                                                 Download (${dataset.total_size_in_human_format})
                                             </a>
-                                            <button 
-                                                class="btn btn-primary btn-sm btn-add-to-cart" 
+                                            <button
+                                                class="btn btn-primary btn-sm btn-add-to-cart"
                                                 data-dataset-id="${dataset.id}"
                                                 data-dataset-title="${dataset.title}"
                                                 id="add-btn-${dataset.id}"
@@ -326,8 +326,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    
-   
+
+
     const modalCloseBtn = document.getElementById('modal-close-btn');
     const modalCancelBtn = document.getElementById('modal-cancel-btn-text');
     const createDatasetBtn = document.getElementById('create-dataset-btn');
@@ -341,17 +341,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('create-dataset-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
         const formData = new FormData();
         const selectedDatasetIds = Array.from(selectedDatasets.keys()).join(',');
-        
+
         formData.append('title', document.getElementById('dataset-title').value);
         formData.append('description', document.getElementById('dataset-description').value);
         formData.append('publication_type', document.getElementById('dataset-publication-type').value);
         formData.append('tags', document.getElementById('dataset-tags').value);
         formData.append('selected_datasets', selectedDatasetIds);
         formData.append('csrf_token', document.getElementById('csrf_token').value);
-        
+
         // Maneja archivos si hay
         const fileInput = document.getElementById('dataset-files');
         if (fileInput.files.length > 0) {
@@ -370,10 +370,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Vacia el carrito
                 selectedDatasets.clear();
                 updateSelectedDatasetsUI();
-                
+
                 // Cierra el modal
                 closeModalOnly();
-                
+
                 const queryInput = document.getElementById('query');
                 queryInput.dispatchEvent(new Event('input', {bubbles: true}));
 
@@ -404,7 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             let filename = document.getElementById('zip-filename').value || "models";
             dModal.style.display = 'none';
-            
+
             const csrfToken = document.getElementById('csrf_token').value;
             const datasetIds = Array.from(selectedDatasets.keys()).map(id => parseInt(id));
 

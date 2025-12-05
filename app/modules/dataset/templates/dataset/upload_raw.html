@@ -9,17 +9,17 @@
         <div class="col-xl-8 col-lg-12">
             <form method="POST" action="{{ url_for('dataset.create_dataset', dataset_type='raw') }}">
                 {{ form.hidden_tag() }}
-                
+
                 <div class="mb-3">
                     {{ form.title.label(class="form-label") }}
                     {{ form.title(class="form-control") }}
                 </div>
-                
+
                 <div class="mb-3">
                     {{ form.desc.label(class="form-label") }}
                     {{ form.desc(class="form-control", rows=3) }}
                 </div>
-                
+
                 <div class="row">
                     <div class="col-6 mb-3">
                         {{ form.publication_type.label(class="form-label") }}

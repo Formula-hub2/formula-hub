@@ -111,7 +111,7 @@
                         </div>
                 </div>
                 {% endif %}
-                
+
                 <div class="row mb-2">
                     <div class="col-md-4 col-12">
                         <span class=" text-secondary">Tags</span>
@@ -164,7 +164,7 @@
     </div>
 
     <div class="col-xl-4 col-lg-12 col-md-12 col-sm-12">
-        
+
         {% include dataset.get_dashboard_template() %}
 
         <a href="/dataset/download/{{ dataset.id }}" class="btn btn-primary mt-3 js-download-trigger" style="border-radius: 5px;" id="download_btn">
@@ -205,9 +205,9 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         feather.replace();
-        
+
         const downloadBtn = document.getElementById('download_btn');
-        
+
         if (downloadBtn) {
             downloadBtn.addEventListener('click', function() {
                 const counterText = document.getElementById('download_count_text');
@@ -220,8 +220,8 @@
 
                 const counterBadge = document.getElementById('download_count_badge');
                 if (counterBadge) {
-                    let currentBadgeText = counterBadge.innerText; 
-                    let currentCount = parseInt(currentBadgeText); 
+                    let currentBadgeText = counterBadge.innerText;
+                    let currentCount = parseInt(currentBadgeText);
                     if (!isNaN(currentCount)) {
                         counterBadge.innerText = (currentCount + 1) + " downloads";
                     }

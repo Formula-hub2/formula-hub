@@ -107,9 +107,9 @@ Traceback (most recent call last):
   File "/home/jesus/formula-hub/venv/lib/python3.12/site-packages/pymysql/err.py", line 150, in raise_mysql_exception
     raise errorclass(errno, errval)
 sqlalchemy.exc.OperationalError: (pymysql.err.OperationalError) (1054, "Unknown column 'user.two_factor_enabled' in 'SELECT'")
-[SQL: SELECT user.id AS user_id, user.email AS user_email, user.password AS user_password, user.created_at AS user_created_at, user.two_factor_enabled AS user_two_factor_enabled, user.two_factor_secret AS user_two_factor_secret 
-FROM user 
-WHERE user.email = %(email_1)s 
+[SQL: SELECT user.id AS user_id, user.email AS user_email, user.password AS user_password, user.created_at AS user_created_at, user.two_factor_enabled AS user_two_factor_enabled, user.two_factor_secret AS user_two_factor_secret
+FROM user
+WHERE user.email = %(email_1)s
  LIMIT %(param_1)s]
 [parameters: {'email_1': 'user1@example.com', 'param_1': 1}]
 (Background on this error at: https://sqlalche.me/e/20/e3q8)

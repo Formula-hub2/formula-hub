@@ -33,8 +33,8 @@ def calculate_checksum_and_size(file_path):
     file_size = os.path.getsize(file_path)
     with open(file_path, "rb") as file:
         content = file.read()
-        hash_md5 = hashlib.md5(content).hexdigest()
-        return hash_md5, file_size
+    hash_md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
+    return hash_md5, file_size
 
 
 # === SERVICIO BASE ===
@@ -228,7 +228,11 @@ class UVLDataSetService(DataSetService):
                 file_path = os.path.join(current_user.temp_folder(), uvl_filename)
                 checksum, size = calculate_checksum_and_size(file_path)
                 file = self.hubfilerepository.create(
-                    commit=False, name=uvl_filename, checksum=checksum, size=size, feature_model_id=fm.id
+                    commit=False,
+                    name=uvl_filename,
+                    checksum=checksum,
+                    size=size,
+                    feature_model_id=fm.id,
                 )
                 fm.files.append(file)
 
@@ -325,6 +329,6 @@ class SizeService:
         elif size < 1024**2:
             return f"{round(size / 1024, 2)} KB"
         elif size < 1024**3:
-            return f"{round(size / (1024 ** 2), 2)} MB"
+            return f"{round(size / (1024**2), 2)} MB"
         else:
-            return f"{round(size / (1024 ** 3), 2)} GB"
+            return f"{round(size / (1024**3), 2)} GB"

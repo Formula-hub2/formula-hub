@@ -20,9 +20,16 @@ jobs:
           name: coverage-report
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ github.event.workflow_run.id }}
+          # path: .  <-- Opcional: fuerza la descarga en la raíz si es necesario
+
+      # PASO DE DEBUG CRUCIAL: Ver dónde ha caído el archivo
+      - name: Debug File Location
+        run: ls -R
 
       - name: Upload to Codacy
         uses: codacy/codacy-coverage-reporter-action@v1
         with:
           project-token: ${{ secrets.CODACY_API_TOKEN }}
+          # Si en el paso 'ls -R' ves que el archivo está en una carpeta, ajusta esto:
+          # Ej: coverage-reports: coverage-report/coverage.xml
           coverage-reports: coverage.xml
