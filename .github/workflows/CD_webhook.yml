@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-24.04
+    # Solo ejecutamos si los tests pasaron y es un push a main
     if: >
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
@@ -16,31 +16,31 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      # 1. Disparar el despliegue en Render
-      - name: Trigger Deployment Webhook
-        id: deploy_trigger # Le ponemos ID para saber si falló
-        env:
-          WEBHOOK_DOMAIN: ${{ secrets.WEBHOOK_DOMAIN }}
-          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
+      # 1. Disparar el despliegue en Render usando la URL nativa
+      - name: Trigger Render Deployment
+        if: success()
         run: |
-          curl -X POST \
-            https://${{ secrets.WEBHOOK_DOMAIN }}/webhook/deploy \
-            -H "Authorization: Bearer ${{ secrets.WEBHOOK_TOKEN }}"
+          if [ -z "${{ secrets.WEBHOOK_DOMAIN }}" ]; then
+            echo "ERROR: No has configurado el secreto WEBHOOK_DOMAIN"
+            exit 1
+          fi
+          # La URL completa ya incluye la autenticación
+          curl -X POST "${{ secrets.WEBHOOK_DOMAIN }}"
 
       # 2. Notificar ÉXITO a Discord
       - name: Discord Notification - Success
-        if: success() # Solo si el paso anterior (curl) funcionó
+        if: success()
         uses: Ilshidur/action-discord@master
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         with:
-          args: '🚀 **UVLHub Desplegado!** La nueva versión en `main` se ha enviado a Render correctamente.'
+          args: '🚀 **Despliegue Iniciado!** Render ha recibido la orden de actualizar la versión en `main`.'
 
-      # 3. Notificar FALLO a Discord (Opcional pero recomendado)
+      # 3. Notificar FALLO a Discord
       - name: Discord Notification - Failure
-        if: failure() # Solo si el curl falló
+        if: failure()
         uses: Ilshidur/action-discord@master
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         with:
-          args: '🚨 **Error en Despliegue:** No se pudo contactar con Render para actualizar UVLHub.'
+          args: '🚨 **Error en Despliegue:** No se pudo contactar con el Deploy Hook de Render.'

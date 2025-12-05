@@ -137,11 +137,11 @@
             button.addEventListener('click', function() {
                 // 1. Subimos hasta encontrar la fila (tr) donde está este botón
                 const row = this.closest('tr');
-                
+
                 if (row) {
                     // 2. Buscamos la celda del contador DENTRO de esa fila
                     const countCell = row.querySelector('.js-download-count');
-                    
+
                     if (countCell) {
                         // 3. Magia matemática
                         let currentCount = parseInt(countCell.innerText.trim());

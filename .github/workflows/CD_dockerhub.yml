@@ -4,7 +4,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main  
+      - main
 
 jobs:
   build-and-push:
@@ -27,7 +27,7 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: docker/images/Dockerfile.dev  
+          file: docker/images/Dockerfile.dev
           push: true
           tags: |
             ${{ secrets.DOCKER_USER }}/formula-hub:latest

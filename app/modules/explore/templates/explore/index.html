@@ -171,7 +171,7 @@
                 <h5 class="modal-title">Create New Dataset</h5>
                 <button type="button" class="btn-close btn-close-white" id="modal-close-btn"></button>
             </div>
-            
+
             <form id="create-dataset-form">
                 <div class="modal-body">
                     {% if csrf_token %}
@@ -179,7 +179,7 @@
                     {% else %}
                     <input type="hidden" id="csrf_token" name="csrf_token" value="">
                     {% endif %}
-                    
+
                     <div class="mb-3 row">
                         <label for="dataset-title" class="col-sm-4 col-form-label">Dataset Title</label>
                         <div class="col-sm-8">
@@ -227,27 +227,27 @@
                             <input type="text" class="form-control" id="dataset-tags">
                         </div>
                     </div>
-                    
+
                     <div class="mb-3 row align-items-center">
                         <label class="col-sm-4 col-form-label">Upload Files</label>
                         <div class="col-sm-8 d-flex justify-content-end">
                             <button type="button" class="btn btn-sm" style="background-color: #69a7d6; color: white;">Browse Files</button>
                         </div>
-                        <input type="file" id="dataset-files" multiple style="display: none;"> 
+                        <input type="file" id="dataset-files" multiple style="display: none;">
                     </div>
 
                     <input type="hidden" id="selected-dataset-ids" name="selected_datasets">
 
                 </div>
-                
-                <div class="modal-footer d-block text-center p-4"> 
-                    
+
+                <div class="modal-footer d-block text-center p-4">
+
                     <button type="submit" class="btn btn-primary btn-lg create-btn-custom-width">
                         Create Dataset
                     </button>
-                    
+
                     <div class="mt-2 text-start">
-                        <span id="modal-cancel-btn-text" class="text-secondary fw-bold" 
+                        <span id="modal-cancel-btn-text" class="text-secondary fw-bold"
                             style="cursor: pointer;"
                         >
                             Cancel
@@ -270,7 +270,7 @@
                 <p class="text-secondary">Enter filename:</p>
                 <div class="mb-3"><input type="text" class="form-control" id="zip-filename" placeholder="models" required></div>
             </div>
-            <div class="modal-footer d-block text-center p-4"> 
+            <div class="modal-footer d-block text-center p-4">
                 <button type="submit" class="btn btn-success btn-lg create-btn-custom-width">Download .zip</button>
             </div>
         </form>
@@ -281,18 +281,18 @@
 .modal {
     position: fixed;
     inset: 0;
-    background-color: rgba(0, 0, 0, 0.5); 
-    display: none; 
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
     justify-content: center;
     align-items: center;
-    z-index: 1050; 
+    z-index: 1050;
     backdrop-filter: blur(5px);
 }
 
 .modal-dialog {
     max-width: 600px;
-    width: 60% !important; 
-    margin: 1.75rem auto; 
+    width: 60% !important;
+    margin: 1.75rem auto;
 }
 
 .modal-content {
@@ -303,7 +303,7 @@
 }
 
 .modal-header{
-    background-color: #222e3a !important; 
+    background-color: #222e3a !important;
     border-bottom: none;
 }
 
@@ -312,12 +312,12 @@
 }
 
 .create-btn-custom-width {
-    width: 100% !important; 
+    width: 100% !important;
     max-width: 500px;
 }
 
 .btn-close-white {
-    filter: invert(1); 
+    filter: invert(1);
 }
 
 </style>

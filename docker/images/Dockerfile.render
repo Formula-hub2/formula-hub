@@ -8,7 +8,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && apt-get install -y --no-install-recommends bash \
     && apt-get install -y --no-install-recommends openrc \
-    && apt-get install -y --no-install-recommends build-essential 
+    && apt-get install -y --no-install-recommends build-essential
 
 # Clean up
 RUN apt-get clean \
@@ -43,8 +43,11 @@ RUN echo "webhook" > /app/.moduleignore
 # Update pip
 RUN pip install --no-cache-dir --upgrade pip
 
+RUN apt-get update && apt-get install -y git
 # Install any needed packages specified in requirements.txt
 RUN pip install -r requirements.txt
+
+RUN cp -r src/rosemary/rosemary /app/rosemary
 
 # Expose port 80
 EXPOSE 80
