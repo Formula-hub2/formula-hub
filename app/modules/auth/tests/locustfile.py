@@ -1,6 +1,8 @@
 import pyotp
-from locust import HttpUser, TaskSet, task
+from locust import HttpUser, TaskSet, events, task
 
+from app import create_app
+from app.modules.auth.repositories import UserRepository
 from core.environment.host import get_host_for_locust_testing
 from core.locust.common import fake, get_csrf_token
 
@@ -56,6 +58,87 @@ class AuthUser(HttpUser):
     host = get_host_for_locust_testing()
 
 
+# --- CONSTANTES DE CONFIGURACIÓN ---
+USER_EMAIL = "user4@example.com"
+USER_PASSWORD = "1234"
+# Definimos un secreto FIJO aquí. El script forzará que la DB tenga este valor al iniciar.
+FIXED_SECRET = "VHZHTPR5ZSXR564A2XTZ56JSLUA4XNYK"
+
+
+# --- SETUP INICIAL (SE EJECUTA UNA VEZ AL INICIO) ---
+@events.test_start.add_listener
+def on_test_start(environment, **kwargs):
+    """
+    Este método se ejecuta antes de empezar el test de carga.
+    Se conecta a la DB, crea user4 si no existe y le ASIGNA el secreto fijo.
+    """
+    print("🚀 [SETUP] Iniciando preparación de datos para User4...")
+
+    flask_app = create_app()
+    with flask_app.app_context():
+        repo = UserRepository()
+        user = repo.get_by_email(USER_EMAIL)
+
+        # 1. Crear usuario si no existe
+        if not user:
+            print(f"👤 [SETUP] Creando usuario {USER_EMAIL}...")
+            user = repo.create(email=USER_EMAIL, password=USER_PASSWORD)
+
+        # 2. Forzar el secreto determinado
+        # Esto es clave: actualizamos la DB para que coincida con nuestra constante
+        needs_save = False
+
+        if user.two_factor_secret != FIXED_SECRET:
+            print("🔑 [SETUP] Actualizando secreto 2FA en DB para coincidir con el test...")
+            user.two_factor_secret = FIXED_SECRET
+            needs_save = True
+
+        if not user.two_factor_enabled:
+            print("🛡️ [SETUP] Activando 2FA para el usuario...")
+            user.two_factor_enabled = True
+            needs_save = True
+
+        if needs_save:
+            repo.session.add(user)
+            repo.session.commit()
+            print("✅ [SETUP] Base de datos sincronizada correctamente.")
+        else:
+            print("✅ [SETUP] El usuario ya estaba configurado correctamente.")
+
+
+# --- TEARDOWN FINAL (SE EJECUTA AL TERMINAR) ---
+@events.test_stop.add_listener
+def on_test_stop(environment, **kwargs):
+    """
+    Se ejecuta una sola vez al detenerse el test (por tiempo o Ctrl+C).
+    Elimina el usuario de prueba para no dejar basura en la DB.
+    """
+    print("🧹 [TEARDOWN] Limpiando datos de prueba...")
+
+    flask_app = create_app()
+    with flask_app.app_context():
+        repo = UserRepository()
+        user = repo.get_by_email(USER_EMAIL)
+
+        if user:
+            # Como el modelo no tiene cascade delete, primero borramos sus sesiones manualmente
+            if hasattr(user, "sessions") and user.sessions:
+                try:
+                    print(f"🧹 [TEARDOWN] Borrando {len(user.sessions)} sesiones activas...")
+                    for session in user.sessions:
+                        repo.session.delete(session)
+                    repo.session.commit()
+                except Exception as e:
+                    print(f"⚠️ [TEARDOWN] Error borrando sesiones: {e}")
+                    repo.session.rollback()
+
+            # Ahora ya podemos borrar el usuario seguro
+            repo.delete(user.id)
+            print(f"🗑️ [TEARDOWN] Usuario {USER_EMAIL} eliminado correctamente.")
+        else:
+            print(f"ℹ️ [TEARDOWN] El usuario {USER_EMAIL} no se encontró (¿ya eliminado?).")
+
+
 class TwoFactorLoginBehavior(TaskSet):
     def on_start(self):
         """Al iniciar, aseguramos sesión limpia e intentamos el login completo"""
@@ -67,7 +150,7 @@ class TwoFactorLoginBehavior(TaskSet):
 
     @task
     def login_with_2fa(self):
-        # Limpieza agresiva de cookies para forzar que nos pida 2FA
+        # 1. Limpieza agresiva de cookies para forzar que nos pida 2FA
         self.client.cookies.clear()
 
         # 2. GET LOGIN
@@ -80,10 +163,8 @@ class TwoFactorLoginBehavior(TaskSet):
         # 3. POST CREDENCIALES
         # Nota: Importante no enviar cookies de device_id si queremos forzar el 2FA
         response = self.client.post(
-            "/login", data={"email": "user1@example.com", "password": "1234", "csrf_token": csrf_token_login}
+            "/login", data={"email": USER_EMAIL, "password": USER_PASSWORD, "csrf_token": csrf_token_login}
         )
-
-        # --- AQUÍ ESTÁ EL ARREGLO ---
 
         # Caso A: Nos mandó al Index (Se saltó el 2FA o login normal)
         if "/verify_2fa" not in response.url:
@@ -104,10 +185,8 @@ class TwoFactorLoginBehavior(TaskSet):
             print("❌ Estamos en /verify_2fa pero no veo el input hidden csrf_token.")
             return
 
-        # Generar código y enviar
-        # COPIAR SECRET DE LA DB EN CASO DE REINICIARLA
-        secret = "VHZHTPR5ZSXR564A2XTZ56JSLUA4XNYK"
-        totp = pyotp.TOTP(secret).now()
+        # Generar código usando la CONSTANTE FIJA. Como el setup ya forzó este secreto en la DB, siempre funcionará
+        totp = pyotp.TOTP(FIXED_SECRET).now()
 
         response_final = self.client.post("/verify_2fa", data={"token": totp, "csrf_token": csrf_token_2fa})
 
