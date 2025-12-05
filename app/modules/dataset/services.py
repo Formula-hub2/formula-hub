@@ -130,7 +130,7 @@ class DataSetService(BaseService):
                     self.repository.session.commit()
 
                     # B. Crear nuevo FeatureModel enlazado al nuevo Dataset
-                    new_fm = FeatureModel(data_set_id=dataset.id, fm_meta_data_id=new_fm_meta.id)
+                    new_fm = FeatureModel(uvl_dataset_id=dataset.id, fm_meta_data_id=new_fm_meta.id)
                     self.repository.session.add(new_fm)
                     self.repository.session.commit()
 
@@ -223,7 +223,7 @@ class UVLDataSetService(DataSetService):
                     fmmetadata.authors.append(author)
 
                 fm = self.feature_model_repository.create(
-                    commit=False, data_set_id=dataset.id, fm_meta_data_id=fmmetadata.id
+                    commit=False, uvl_dataset_id=dataset.id, fm_meta_data_id=fmmetadata.id
                 )
                 file_path = os.path.join(current_user.temp_folder(), uvl_filename)
                 checksum, size = calculate_checksum_and_size(file_path)

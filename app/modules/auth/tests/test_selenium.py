@@ -6,7 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 from app import create_app  # <--- IMPORTANTE: Necesitas esto
-from app.modules.auth.repositories import UserRepository, User
+from app.modules.auth.repositories import UserRepository
 from core.environment.host import get_host_for_selenium_testing
 from core.selenium.common import close_driver, initialize_driver
 
@@ -70,20 +70,20 @@ def test_login_with_2fa_selenium():
         with flask_app.app_context():
             repo = UserRepository()
             user = repo.get_by_email("user3@example.com")
-            
+
             # Si el usuario NO existe, lo creamos dinámicamente
             if not user:
                 print("El usuario user3 no existe. Creando...")
                 # Nota: Ajusta la clase User según los campos obligatorios de tu modelo
                 user = repo.create(email="user3@example.com", password="1234")
-                
+
             # Configurar 2FA
             # (Lo hacemos en un paso separado por si el usuario ya existía pero no tenía 2FA)
             if not user.two_factor_secret:
                 user.two_factor_secret = pyotp.random_base32()
                 user.two_factor_enabled = True
                 repo.session.commit()
-                
+
             # Guardamos el secreto en una variable para usarla fuera del contexto
             secret = user.two_factor_secret
         # --- FIN PREPARACION ---

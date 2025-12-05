@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 from app.modules.auth.models import User
-from app.modules.dataset.models import Author, DataSet, DSMetaData, DSMetrics, PublicationType
+from app.modules.dataset.models import Author, DSMetaData, DSMetrics, PublicationType, UVLDataSet
 from app.modules.featuremodel.models import FeatureModel, FMMetaData
 from app.modules.hubfile.models import Hubfile
 from core.seeders.BaseSeeder import BaseSeeder
@@ -55,9 +55,9 @@ class DataSetSeeder(BaseSeeder):
         ]
         self.seed(authors)
 
-        # Create DataSet instances
+        # Create UVLDataSet instances
         datasets = [
-            DataSet(
+            UVLDataSet(
                 user_id=user1.id if i % 2 == 0 else user2.id,
                 ds_meta_data_id=seeded_ds_meta_data[i].id,
                 created_at=datetime.now(timezone.utc),
@@ -94,7 +94,7 @@ class DataSetSeeder(BaseSeeder):
         self.seed(fm_authors)
 
         feature_models = [
-            FeatureModel(data_set_id=seeded_datasets[i // 3].id, fm_meta_data_id=seeded_fm_meta_data[i].id)
+            FeatureModel(uvl_dataset_id=seeded_datasets[i // 3].id, fm_meta_data_id=seeded_fm_meta_data[i].id)
             for i in range(12)
         ]
         seeded_feature_models = self.seed(feature_models)
@@ -106,7 +106,7 @@ class DataSetSeeder(BaseSeeder):
         for i in range(12):
             file_name = f"file{i+1}.uvl"
             feature_model = seeded_feature_models[i]
-            dataset = next(ds for ds in seeded_datasets if ds.id == feature_model.data_set_id)
+            dataset = next(ds for ds in seeded_datasets if ds.id == feature_model.uvl_dataset_id)
             user_id = dataset.user_id
 
             dest_folder = os.path.join(working_dir, "uploads", f"user_{user_id}", f"dataset_{dataset.id}")
