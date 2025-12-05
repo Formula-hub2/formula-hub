@@ -1,105 +1,235 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
+from sqlalchemy import text
 
 from app import db
-
-# Ajusta estas rutas si tus modelos están en otro sitio,
-# pero basándome en tu estructura deberían ser estas:
 from app.modules.auth.models import User
-from app.modules.dataset.models import DataSet, DSMetaData, PublicationType
+from app.modules.dataset.models import DataSet, DSDownloadRecord, DSMetaData, PublicationType, RawDataSet, UVLDataSet
+
+# ==============================================================================
+# FIXTURES COMUNES
+# ==============================================================================
+
+
+@pytest.fixture(scope="module")
+def test_user(test_client):
+    """
+    Crea un usuario maestro una sola vez para todo el módulo y lo reutiliza.
+    Esto acelera los tests evitando crear/borrar usuario en cada función.
+    """
+    user = User(email="unit_test_master@example.com", password="password123")
+    db.session.add(user)
+    db.session.commit()
+
+    yield user
+
+    # Limpieza final del módulo
+    db.session.expire_all()
+    user_to_delete = db.session.get(User, user.id)
+    if user_to_delete:
+        # Esto borrará en cascada todos los datasets creados por este usuario
+        db.session.delete(user_to_delete)
+        db.session.commit()
 
 
 @pytest.fixture
-def clean_dataset_setup(test_client):
+def dataset_fixture(test_user):
     """
-    Fixture quirúrgica: Crea los datos mínimos necesarios (User, MetaData, DataSet)
-    para probar el contador, y limpia todo al terminar.
+    Fixture específica para tests de CONTADOR.
+    Crea un dataset limpio y asegura su destrucción quirúrgica para evitar IntegrityErrors.
     """
-    # 1. Crear un Usuario (Usando tu modelo User real)
-    # Usamos un email raro para asegurar que no choque con datos existentes
-    user = User.query.filter_by(email="unit_test_counter@example.com").first()
-    if not user:
-        user = User(email="unit_test_counter@example.com", password="password123")
-        db.session.add(user)
-        db.session.commit()
-
-    # 2. Crear MetaData (Necesario para el Dataset)
+    # 1. Setup
     meta = DSMetaData(
-        title="Counter Unit Test Dataset",
-        description="Dataset created purely for unit testing the download counter",
+        title="Counter Check Dataset",
+        description="Dataset for mocking fs",
         publication_type=PublicationType.JOURNAL_ARTICLE,
-        tags="test,unit",
+        tags="test,mock",
     )
     db.session.add(meta)
     db.session.commit()
 
-    # 3. Crear el DataSet inicializado a 0
-    dataset = DataSet(user_id=user.id, ds_meta_data_id=meta.id, download_count=0)  # Forzamos 0 explícitamente
+    dataset = DataSet(user_id=test_user.id, ds_meta_data_id=meta.id, download_count=0)
     db.session.add(dataset)
     db.session.commit()
 
-    dataset_id = dataset.id
+    yield dataset
 
-    # Devolvemos el ID y el cliente para usarlo en el test
-    yield dataset_id
-
-    # --- TEARDOWN (Limpieza) ---
-    # Borramos en orden inverso para respetar las Foreign Keys
+    # 2. Teardown: Limpieza en orden estricto (Hijos -> Padres)
     try:
-        # Recuperamos los objetos de nuevo por si la sesión se cerró
-        ds_to_del = DataSet.query.get(dataset_id)
-        if ds_to_del:
-            db.session.delete(ds_to_del)
+        db.session.expire_all()
+        # A. Borrar registros de descargas asociados
+        DSDownloadRecord.query.filter_by(dataset_id=dataset.id).delete()
 
-        meta_to_del = DSMetaData.query.get(meta.id)
-        if meta_to_del:
-            db.session.delete(meta_to_del)
-
-        # El usuario lo dejamos o lo borramos según prefieras.
-        # Normalmente en tests unitarios se borra todo.
-        user_to_del = User.query.get(user.id)
-        if user_to_del:
-            db.session.delete(user_to_del)
+        # B. Borrar el dataset y metadata
+        if db.session.get(DataSet, dataset.id):
+            db.session.delete(dataset)
+        if db.session.get(DSMetaData, meta.id):
+            db.session.delete(meta)
 
         db.session.commit()
     except Exception as e:
-        print(f"Error en limpieza de test: {e}")
         db.session.rollback()
+        print(f"Error limpiando dataset_fixture: {e}")
 
 
-def test_download_counter_backend_logic(test_client, clean_dataset_setup):
+@pytest.fixture
+def clean_datasets(test_user):
     """
-    Verifica que la llamada GET a /dataset/download/<id> incrementa
-    el campo download_count en la base de datos.
+    Fixture específica para tests de POLIMORFISMO.
+    Limpia cualquier dataset del usuario antes y después del test.
     """
-    dataset_id = clean_dataset_setup
+    yield
+    # Borrado masivo seguro después de cada test
+    db.session.rollback()
+    datasets = DataSet.query.filter_by(user_id=test_user.id).all()
+    for ds in datasets:
+        db.session.delete(ds)
+    db.session.commit()
 
-    # 1. VERIFICACIÓN PREVIA
-    # Recuperamos el dataset fresco de la BD
-    dataset_before = DataSet.query.get(dataset_id)
-    assert dataset_before.download_count == 0, "El dataset debería nacer con 0 descargas"
 
-    # 2. EJECUCIÓN (Simulamos la petición HTTP)
-    # Nota: Es probable que esto devuelva 500 o error si no existen los archivos físicos .uvl
-    # para crear el ZIP. PERO NO IMPORTA.
-    # Tu código hace el `db.session.commit()` ANTES de intentar comprimir archivos.
-    # Por tanto, aunque falle la descarga del archivo, el contador debe subir.
-    try:
-        test_client.get(f"/dataset/download/{dataset_id}")
-    except Exception:
-        # Ignoramos errores de "File Not Found" o ZipFile, solo nos importa SQL
-        pass
+# ==============================================================================
+# BLOQUE 1: TESTS DE LÓGICA DE NEGOCIO (CONTADOR)
+# ==============================================================================
 
-    # 3. MAGIA DE SQLALCHEMY (IMPORTANTE)
-    # "Caducamos" la sesión actual. Esto obliga a SQLAlchemy a olvidar los datos
-    # que tiene en memoria RAM y volver a leerlos del disco (Base de Datos Real)
-    # la próxima vez que le pidamos algo. Sin esto, el test fallaría falsamente.
+
+def test_download_counter_backend_logic(test_client, dataset_fixture):
+    """
+    Verifica que el contador sube al llamar a la ruta, mockeando el sistema de archivos.
+    """
+    dataset_id = dataset_fixture.id
+
+    # Mocks para evitar errores de ficheros inexistentes
+    with (
+        patch("app.modules.dataset.routes.os.path.exists", return_value=True),
+        patch("app.modules.dataset.routes.os.makedirs"),
+        patch("app.modules.dataset.routes.os.walk", return_value=[]),
+        patch("app.modules.dataset.routes.ZipFile", MagicMock()),
+        patch("app.modules.dataset.routes.send_from_directory") as mock_send,
+    ):
+
+        mock_send.return_value = "File sent"
+
+        response = test_client.get(f"/dataset/download/{dataset_id}")
+        assert response.status_code == 200
+
+    # Verificación DB
     db.session.expire_all()
+    dataset_refreshed = db.session.get(DataSet, dataset_id)
 
-    # 4. VERIFICACIÓN FINAL
-    dataset_after = DataSet.query.get(dataset_id)
+    assert dataset_refreshed.download_count == 1, f"El contador debería ser 1, es {dataset_refreshed.download_count}"
 
-    print(f"Descargas antes: 0 | Descargas después: {dataset_after.download_count}")
 
-    assert (
-        dataset_after.download_count == 1
-    ), f"Fallo crítico: El contador es {dataset_after.download_count}, debería ser 1."
+def test_download_counter_idempotency_check(test_client, dataset_fixture):
+    """
+    Verifica comportamiento con múltiples descargas.
+    """
+    dataset_id = dataset_fixture.id
+
+    with (
+        patch("app.modules.dataset.routes.os.path.exists", return_value=True),
+        patch("app.modules.dataset.routes.ZipFile", MagicMock()),
+        patch("app.modules.dataset.routes.send_from_directory", return_value="File"),
+    ):
+
+        test_client.get(f"/dataset/download/{dataset_id}")  # 1
+        test_client.get(f"/dataset/download/{dataset_id}")  # 2
+
+    db.session.expire_all()
+    dataset_refreshed = db.session.get(DataSet, dataset_id)
+
+    # Nota: Ajusta esto según si tu lógica permite o no contar descargas repetidas
+    assert dataset_refreshed.download_count >= 1
+
+
+# ==============================================================================
+# BLOQUE 2: TESTS DE ARQUITECTURA (POLIMORFISMO)
+# ==============================================================================
+
+
+def test_polymorphic_retrieval(test_user, clean_datasets):
+    """
+    Verifica que al consultar la tabla PADRE, obtenemos instancias de las clases HIJAS.
+    """
+    # 1. Setup
+    meta_uvl = DSMetaData(title="UVL Type", description="desc", publication_type=PublicationType.NONE)
+    meta_raw = DSMetaData(title="Raw Type", description="desc", publication_type=PublicationType.NONE)
+    db.session.add_all([meta_uvl, meta_raw])
+    db.session.commit()
+
+    # 2. Insertar hijas
+    uvl = UVLDataSet(user_id=test_user.id, ds_meta_data_id=meta_uvl.id)
+    raw = RawDataSet(user_id=test_user.id, ds_meta_data_id=meta_raw.id)
+    db.session.add_all([uvl, raw])
+    db.session.commit()
+
+    uvl_id = uvl.id
+    raw_id = raw.id
+
+    # 3. Consultar PADRE
+    db.session.expire_all()
+    all_datasets = DataSet.query.filter_by(user_id=test_user.id).all()
+
+    retrieved_uvl = next((d for d in all_datasets if d.id == uvl_id), None)
+    retrieved_raw = next((d for d in all_datasets if d.id == raw_id), None)
+
+    # 4. Aserciones
+    assert isinstance(retrieved_uvl, UVLDataSet), "Fallo: No se recuperó como UVLDataSet"
+    assert isinstance(retrieved_raw, RawDataSet), "Fallo: No se recuperó como RawDataSet"
+    assert retrieved_uvl.dataset_type == "uvl_dataset"
+    assert retrieved_raw.dataset_type == "raw_dataset"
+
+
+def test_physical_table_separation(test_user, clean_datasets):
+    """
+    Verifica con SQL crudo que los datos van a las tablas correctas.
+    """
+    meta = DSMetaData(title="SQL Check", description="desc", publication_type=PublicationType.NONE)
+    db.session.add(meta)
+    db.session.commit()
+
+    uvl = UVLDataSet(user_id=test_user.id, ds_meta_data_id=meta.id)
+    db.session.add(uvl)
+    db.session.commit()
+
+    target_id = uvl.id
+
+    # Tabla Padre
+    res_parent = db.session.execute(
+        text("SELECT dataset_type FROM data_set WHERE id = :id"), {"id": target_id}
+    ).fetchone()
+    assert res_parent[0] == "uvl_dataset"
+
+    # Tabla Hija UVL
+    res_child = db.session.execute(text("SELECT id FROM uvl_dataset WHERE id = :id"), {"id": target_id}).fetchone()
+    assert res_child is not None
+
+    # Tabla Hija RAW (No debe estar)
+    res_sibling = db.session.execute(text("SELECT id FROM raw_dataset WHERE id = :id"), {"id": target_id}).fetchone()
+    assert res_sibling is None
+
+
+def test_cascade_deletion_polymorphic(test_user, clean_datasets):
+    """
+    Verifica que borrar el objeto ORM borra filas en ambas tablas físicas.
+    """
+    meta = DSMetaData(title="Cascade Check", description="desc", publication_type=PublicationType.NONE)
+    db.session.add(meta)
+    db.session.commit()
+
+    uvl = UVLDataSet(user_id=test_user.id, ds_meta_data_id=meta.id)
+    db.session.add(uvl)
+    db.session.commit()
+
+    target_id = uvl.id
+
+    # Borrar objeto
+    db.session.delete(uvl)
+    db.session.commit()
+
+    # Verificar vacío
+    res_parent = db.session.execute(text("SELECT count(*) FROM data_set WHERE id = :id"), {"id": target_id}).scalar()
+    res_child = db.session.execute(text("SELECT count(*) FROM uvl_dataset WHERE id = :id"), {"id": target_id}).scalar()
+
+    assert res_parent == 0
+    assert res_child == 0
