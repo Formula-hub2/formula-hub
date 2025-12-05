@@ -255,11 +255,11 @@ def upgrade():
     op.create_table(
         "feature_model",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("data_set_id", sa.Integer(), nullable=False),
+        sa.Column("uvl_dataset_id", sa.Integer(), nullable=False),
         sa.Column("fm_meta_data_id", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["data_set_id"],
-            ["data_set.id"],
+            ["uvl_dataset_id"],
+            ["uvl_dataset.id"],
         ),
         sa.ForeignKeyConstraint(
             ["fm_meta_data_id"],

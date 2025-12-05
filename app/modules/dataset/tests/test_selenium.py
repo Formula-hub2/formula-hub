@@ -100,7 +100,7 @@ def test_full_lifecycle():
         driver.execute_script(
             "arguments[0].style.visibility = 'visible'; "
             "arguments[0].style.height = '1px'; "
-            "rguments[0].style.width = '1px'; "
+            "arguments[0].style.width = '1px'; "
             "arguments[0].style.opacity = 1",
             dropzone_input,
         )
