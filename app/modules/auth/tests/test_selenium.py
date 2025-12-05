@@ -6,7 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 from app import create_app  # <--- IMPORTANTE: Necesitas esto
-from app.modules.auth.repositories import UserRepository
+from app.modules.auth.repositories import UserRepository, User
 from core.environment.host import get_host_for_selenium_testing
 from core.selenium.common import close_driver, initialize_driver
 
@@ -62,6 +62,32 @@ def test_login_with_2fa_selenium():
     try:
         host = get_host_for_selenium_testing()
 
+        # --- PREPARACIÓN DE DATOS ---
+        # Creamos una instancia de la app solo para consultar/escribir en la DB
+        flask_app = create_app()
+
+        # Entramos en el contexto de la aplicación
+        with flask_app.app_context():
+            repo = UserRepository()
+            user = repo.get_by_email("user3@example.com")
+            
+            # Si el usuario NO existe, lo creamos dinámicamente
+            if not user:
+                print("El usuario user3 no existe. Creando...")
+                # Nota: Ajusta la clase User según los campos obligatorios de tu modelo
+                user = repo.create(email="user3@example.com", password="1234")
+                
+            # Configurar 2FA
+            # (Lo hacemos en un paso separado por si el usuario ya existía pero no tenía 2FA)
+            if not user.two_factor_secret:
+                user.two_factor_secret = pyotp.random_base32()
+                user.two_factor_enabled = True
+                repo.session.commit()
+                
+            # Guardamos el secreto en una variable para usarla fuera del contexto
+            secret = user.two_factor_secret
+        # --- FIN PREPARACION ---
+
         # Abrir la página de login
         driver.get(f"{host}/login")
         time.sleep(2)
@@ -70,8 +96,8 @@ def test_login_with_2fa_selenium():
         email_field = driver.find_element(By.NAME, "email")
         password_field = driver.find_element(By.NAME, "password")
 
-        # Datos de usuario con 2FA
-        email_field.send_keys("user1@example.com")
+        # Usamos los credenciales de user3 que aseguramos existen arriba
+        email_field.send_keys("user3@example.com")
         password_field.send_keys("1234")
         password_field.send_keys(Keys.RETURN)
         time.sleep(2)
@@ -79,18 +105,7 @@ def test_login_with_2fa_selenium():
         # Ahora debería redirigir a /verify_2fa
         assert "/verify_2fa" in driver.current_url
 
-        # --- AQUÍ ESTÁ EL CAMBIO ---
-        # Creamos una instancia de la app solo para consultar la DB
-        flask_app = create_app()
-
-        # Entramos en el contexto de la aplicación
-        with flask_app.app_context():
-            user = UserRepository().get_by_email("user1@example.com")
-            # Guardamos el secreto en una variable de texto para usarla fuera
-            secret = user.two_factor_secret
-        # --- FIN DEL CAMBIO ---
-
-        # Obtener token TOTP desde la base de datos
+        # Obtener token TOTP usando el secreto real de la DB
         totp = pyotp.TOTP(secret).now()
 
         # Ingresar token en el formulario
@@ -101,9 +116,8 @@ def test_login_with_2fa_selenium():
 
         # Comprobar que se redirige a la página principal
         try:
-
             driver.find_element(By.XPATH, "//h1[contains(@class, 'h2 mb-3') and contains(., 'Latest datasets')]")
-            print("Test passed!")
+            print("Test passed with user3!")
 
         except NoSuchElementException:
             raise AssertionError("Test failed!")
