@@ -88,19 +88,91 @@ Para que este pipeline funcione, el repositorio debe tener configurados los sigu
 
 ---
 
-## 📊 Diagrama de Flujo
+## 📊 Diagrama de Flujo del Pipeline (CI/CD)
+
+Este diagrama ilustra cómo fluye el código desde el desarrollo hasta la producción, diferenciando las responsabilidades de cada rama.
 
 ```mermaid
 graph TD
-    A[Push a Main] --> B{Commit Syntax Check}
-    A --> C{Python Lint}
-    A --> D{Pytest + MariaDB}
+    %% Definición de Estilos
+    classDef branch fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef ci fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+    classDef cd fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef fail fill:#ffebee,stroke:#c62828,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef notification fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
 
-    D -- Success --> E[Upload Coverage Artifact]
-    E --> F[Codacy Reporter]
+    %% --- RAMA TRUNK (INTEGRACIÓN CONTINUA - CI) ---
+    subgraph CI_TRUNK [🔄 CI: Rama Trunk - Control de Calidad]
+        direction TB
+        DEV[Developer Push]:::branch -->|push to trunk| COMMIT{Commit Check}:::ci
+        DEV -->|push to trunk| LINT{Linter & Style}:::ci
 
-    D -- Success --> G[Docker Build & Push]
-    D -- Success --> H[Deploy to Render]
+        COMMIT -->|Pass| TEST_TRUNK{Pytest Unit/Int}:::ci
+        LINT -->|Pass| TEST_TRUNK
 
-    H -- Success --> I[Notificación Discord ✅]
-    H -- Fail --> J[Notificación Discord 🚨]
+        TEST_TRUNK -->|Success| READY[✅ Código Listo para Merge]:::branch
+        TEST_TRUNK -.->|Fail| FIX[❌ Corregir Errores]:::fail
+        COMMIT -.->|Fail| FIX
+        LINT -.->|Fail| FIX
+    end
+
+    %% Transición
+    READY -->|Pull Request Merge| PROD_PUSH[Push a Main]:::branch
+
+    %% --- RAMA MAIN (DESPLIEGUE CONTINUO - CD) ---
+    subgraph CD_MAIN [🚀 CD: Rama Main - Producción]
+        direction TB
+
+        %% Trigger simultáneo al push
+        PROD_PUSH --> DOCKER[🐳 Docker Build & Push]:::cd
+        PROD_PUSH --> TEST_MAIN{Pytest Producción}:::ci
+
+        %% Dependencias de Workflow (workflow_run)
+        TEST_MAIN -->|Success| CODACY[📈 Upload Coverage to Codacy]:::ci
+        TEST_MAIN -->|Success| RENDER_HOOK[🚀 Call Render Deploy Hook]:::cd
+
+        %% Fallos en Main
+        TEST_MAIN -.->|Fail| FAIL_ALERT[❌ Alerta Fallo Crítico]:::fail
+    end
+
+    %% --- NOTIFICACIONES ---
+    subgraph NOTIFICATIONS [📢 Notificaciones]
+        RENDER_HOOK -->|Trigger| RENDER_BUILD[Render: Build & Start]:::cd
+
+        RENDER_BUILD -->|Success| DISCORD_OK[Discord: ✅ Despliegue Exitoso]:::notification
+        RENDER_HOOK -.->|Connection Fail| DISCORD_FAIL[Discord: 🚨 Error Conexión]:::notification
+    end
+
+    %% Conexiones finales
+    DOCKER --> REGISTRY[(Docker Hub)]:::cd
+```
+
+---
+
+## 🧠 Explicación del Flujo
+
+El pipeline se divide en dos carriles principales según la rama en la que trabajes:
+
+#### 1\. 🔄 Fase de Integración Continua (CI) - Rama `trunk`
+
+Esta fase ocurre **mientras desarrollas**. Su objetivo es asegurar que el código nuevo no rompa nada antes de juntarlo con el código principal.
+
+  * **Disparador:** Cada vez que haces `git push` a la rama `trunk`.
+  * **Acciones:**
+    1.  Valida que tus mensajes de commit sigan el estándar.
+    2.  Revisa el estilo del código (Black, Flake8, Isort).
+    3.  Ejecuta los tests en una base de datos temporal.
+  * **Resultado:** Si algo falla, **no** debes hacer merge a `main`.
+
+#### 2\. 🚀 Fase de Despliegue Continuo (CD) - Rama `main`
+
+Esta fase ocurre **cuando aceptas el Pull Request**. Su objetivo es llevar el código aprobado a producción.
+
+  * **Disparador:** Cuando el código llega a `main`.
+  * **Acciones Paralelas:**
+      * **Docker:** Construye la imagen final y la sube a Docker Hub para que cualquiera pueda descargarla.
+      * **Pytest:** Ejecuta los tests una última vez por seguridad.
+  * **Acciones Secuenciales (Solo si Pytest aprueba):**
+      * **Codacy:** Sube el reporte de calidad.
+      * **Render:** Se activa el webhook para actualizar el servidor real.
+      * **Discord:** Te avisa al móvil de que la nueva versión ya está online.

@@ -232,6 +232,3 @@ Documentación técnica detallada para desarrolladores:
 ## 📝 Documentación oficial
 
 You can consult the official documentation of the project at [docs.uvlhub.io](https://docs.uvlhub.io/).
-
-```
-```
