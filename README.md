@@ -1,11 +1,269 @@
-<div style="text-align: center;">
-  <img src="https://www.uvlhub.io/static/img/logos/logo-light.svg" alt="Logo">
-</div>
+# 🧪 Fórmula Hub
 
-# uvlhub.io
+![Python Version](https://img.shields.io/badge/python-3.9%2B-blue?style=for-the-badge&logo=python)
+![Framework](https://img.shields.io/badge/flask-2.0%2B-green?style=for-the-badge&logo=flask)
+![Database](https://img.shields.io/badge/MariaDB-10.5%2B-orange?style=for-the-badge&logo=mariadb)
+![License](https://img.shields.io/badge/license-MIT-lightgrey?style=for-the-badge)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-Active-success?style=for-the-badge&logo=github-actions)
 
-Repository of feature models in UVL format integrated with Zenodo and flamapy following Open Science principles - Developed by DiversoLab
+> **Repositorio de datasets de fórmula 1**
+> Plataforma web para almacenar, compartir y gestionar datasets de propiedades de fórmula 1.
 
-## Official documentation
+<p align="center">
+  </p>
 
-You can consult the official documentation of the project at [docs.uvlhub.io](https://docs.uvlhub.io/)
+Desarrollado con ❤️ por **DiversoLab** en la **Universidad de Sevilla**.
+
+---
+
+## 📋 Tabla de Contenidos
+
+- [✨ Características](#-características)
+- [🔧 Requisitos Previos](#-requisitos-previos)
+- [🚀 Instalación y Configuración](#-instalación-y-configuración)
+- [🎮 Comandos Principales](#-comandos-principales)
+- [📁 Estructura del Proyecto](#-estructura-del-proyecto)
+- [📚 Documentación Adicional](#-documentación-adicional)
+- [🤝 Contribuir](#-contribuir)
+- [🐛 Solución de Problemas](#-solución-de-problemas)
+- [👥 Equipo y Licencia](#-equipo)
+
+---
+
+## ✨ Características
+
+- 📊 **Gestión de Datasets de Materiales**: Almacenamiento estructurado de propiedades de materiales (CSV).
+- 🔍 **Sistema de Recomendaciones**: Descubrimiento inteligente de datasets relacionados basados en tags, autores y propiedades.
+- 👥 **Gestión de Usuarios**: Sistema completo de autenticación y perfiles de usuario.
+- 🌐 **Integración Zenodo**: Publicación directa de datasets con generación de DOI.
+- 🧪 **Testing Completo**: Suite robusta de tests unitarios, de integración y E2E.
+- 🎨 **UI Moderna**: Interfaz responsive y accesible basada en Bootstrap.
+
+---
+
+## 🔧 Requisitos Previos
+
+Asegúrate de tener instalado lo siguiente antes de empezar:
+
+* **Lenguajes:** Python 3.9+, Node.js & npm.
+* **Base de Datos:** MariaDB o MySQL (10.5+).
+* **Control de Versiones:** Git.
+
+### Opcional
+* **Docker:** Para despliegue contenerizado.
+* **mysqldump:** Para copias de seguridad automáticas.
+
+---
+
+## 🚀 Instalación y Configuración
+
+Sigue estos pasos para levantar el entorno de desarrollo local.
+
+### 1. Clonar el Repositorio
+
+```bash
+git clone [https://github.com/tu-usuario/materials-hub.git](https://github.com/tu-usuario/materials-hub.git)
+cd materials-hub
+````
+
+### 2\. Configurar Entorno Virtual
+
+```bash
+# Crear entorno
+python -m venv venv
+
+# Activar (Linux/Mac)
+source venv/bin/activate
+
+# Activar (Windows)
+venv\Scripts\activate
+```
+
+### 3\. Instalar Dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4\. Configurar Variables de Entorno
+
+Crea un archivo `.env` en la raíz y configura:
+
+```ini
+# Configuración de la Aplicación
+FLASK_APP_NAME=MaterialsHub
+FLASK_ENV=development
+DOMAIN=localhost
+SECRET_KEY=cambia-esto-por-una-clave-segura
+
+# Base de Datos
+MARIADB_HOSTNAME=localhost
+MARIADB_PORT=3306
+MARIADB_USER=root
+MARIADB_PASSWORD=tu-password
+MARIADB_DATABASE=uvlhubdb
+
+```
+
+### 6\. Ejecutar la Aplicación
+
+```bash
+flask run
+```
+
+-----
+
+## 🎮 Comandos Principales (Rosemary CLI)
+
+Utilizamos `rosemary`, nuestro CLI personalizado, para gestionar el proyecto.
+
+### 🗄️ Base de Datos
+
+| Comando | Descripción |
+| :--- | :--- |
+| `rosemary db:setup` | Instalación completa (migraciones + seeds). |
+| `rosemary db:status` | Verifica la conexión y estado de migraciones. |
+| `rosemary db:migrate "msg"` | Crea una nueva migración tras cambios en modelos. |
+| `rosemary db:upgrade` | Aplica cambios pendientes a la BD (Backup auto). |
+| `rosemary db:seed` | Puebla la BD con datos falsos. |
+| `rosemary db:reset -y` | **¡Peligro\!** Borra y recrea la base de datos. |
+| `rosemary db:console` | Abre una consola SQL conectada a la BD. |
+
+### 🧪 Testing & Calidad
+
+```bash
+# Tests completos (Pytest)
+pytest -v
+
+# Tests por tipo
+pytest -m unit -v        # Unitarios
+pytest -m integration -v # Integración
+
+# Reporte de cobertura
+pytest --cov=app --cov-report=html
+
+# Tests de carga (Locust)
+locust --host=http://localhost:5000
+
+# Linter y Formateo
+rosemary linter          # Comprobar errores (flake8)
+rosemary linter:fix      # Arreglar formato (black + isort)
+```
+
+### 🛠️ Generadores y Utilidades
+
+```bash
+# Crear un nuevo módulo (scaffolding completo)
+rosemary make:module nombre_modulo
+
+# Listar rutas disponibles
+rosemary route:list
+
+# Limpiar caché y logs
+rosemary clear:cache
+```
+
+-----
+
+## 📁 Estructura del Proyecto
+
+```text
+materials-hub/
+├── app/                  # Núcleo de la aplicación Flask
+│   ├── modules/          # Arquitectura modular
+│   │   ├── auth/         # Login, Registro, Perfil
+│   │   ├── dataset/      # Lógica principal de datasets
+│   │   │   ├── models.py
+│   │   │   ├── routes.py
+│   │   │   ├── services.py
+│   │   │   └── ...
+│   │   └── ...
+│   ├── static/           # Assets (CSS, JS, Img)
+│   └── templates/        # Jinja2 Templates globales
+├── core/                 # Configuración, Managers y Seeders base
+├── backups/              # Backups automáticos de BD
+├── migrations/           # Historial de cambios de BD (Alembic)
+├── rosemary/             # Código fuente del CLI
+├── uploads/              # Archivos subidos por usuarios
+├── docs/                 # Documentación técnica
+└── README.md             # Este archivo
+```
+
+-----
+
+## 📚 Documentación Adicional
+
+Documentación técnica detallada para desarrolladores:
+
+  - 🗃️ **[Guía de Configuración de Base de Datos](https://www.google.com/search?q=docs/database_setup_guide.md)**
+  - 🎣 **[Guía de Pre-commit Hooks](https://www.google.com/search?q=docs/pre-commit-hooks-guide.md)**
+  - 🧬 **[Especificación Materials Dataset](https://www.google.com/search?q=docs/materials_dataset_implementation_summary.md)**
+  - 🧪 **[Guía de Testing](https://www.google.com/search?q=docs/testing_guide.md)**
+  - 🔌 **[Documentación API](https://www.google.com/search?q=docs/api_documentation.md)**
+
+-----
+
+## 🤝 Contribuir
+
+¡Las contribuciones son bienvenidas\! Por favor, sigue este flujo de trabajo:
+
+1.  Crea una rama para tu feature (`git checkout -b feature/mi-feature`).
+2.  **Importante:** Asegúrate de cumplir los estándares (los hooks te avisarán):
+      * **Python:** PEP 8 (flake8).
+      * **Formato:** Black (120 chars).
+      * **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) (ej: `feat: add new filter`).
+3.  Ejecuta los tests (`pytest`) y el linter (`rosemary linter:fix`).
+4.  Haz **Push** y abre un **Pull Request**.
+
+-----
+
+## 🐛 Solución de Problemas
+
+\<details\>
+\<summary\>🔴 Error de conexión a Base de Datos\</summary\>
+
+1.  Verifica que el servicio esté corriendo: `sudo systemctl status mariadb`.
+2.  Comprueba las credenciales en `.env` ejecutando: `rosemary env`.
+3.  Intenta conectar manualmente: `rosemary db:console`.
+
+\</details\>
+
+\<details\>
+\<summary\>🟡 Conflictos en Migraciones\</summary\>
+
+Si la base de datos está desincronizada en desarrollo:
+
+```bash
+rosemary db:reset --clear-migrations -y
+rosemary db:setup -y
+```
+
+*(Nota: Esto borrará los datos locales).*
+
+\</details\>
+
+\<details\>
+\<summary\>🔵 Dependencias Faltantes\</summary\>
+
+```bash
+pip install -r requirements.txt --force-reinstall
+npm install
+```
+
+\</details\>
+
+-----
+
+## 👥 Equipo
+
+Desarrollado por **DiversoLab** - Universidad de Sevilla.
+
+  * [GitHub Profile](https://github.com/tu-usuario/materials-hub)
+  * [Issues](https://github.com/tu-usuario/materials-hub/issues)
+
+## 📝 Licencia
+
+Este proyecto está bajo la licencia **MIT**. Consulta el archivo [LICENSE](https://www.google.com/search?q=LICENSE) para más detalles.
+
+```
+```
