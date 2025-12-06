@@ -219,7 +219,7 @@ Documentación técnica detallada para desarrolladores:
       * **Formato:** Black (120 chars).
       * **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) (ej: `feat: add new filter`).
 3.  Ejecuta los tests (`pytest`) y el linter (`rosemary linter:fix`).
-4.  Haz **Push** y abre un **Pull Request**.
+4.  Haz **Push**.
 
 -----
 
