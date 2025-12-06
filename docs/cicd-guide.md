@@ -105,7 +105,7 @@ Esta fase ocurre **mientras desarrollas**. Su objetivo es asegurar que el códig
 
 #### 2\. 🚀 Fase de Despliegue Continuo (CD) - Rama `main`
 
-Esta fase ocurre **cuando aceptas el Pull Request**. Su objetivo es llevar el código aprobado a producción.
+Su objetivo es llevar el código aprobado a producción.
 
   * **Disparador:** Cuando el código llega a `main`.
   * **Acciones Paralelas:**
