@@ -1,4 +1,4 @@
-# 🧪 Fórmula Hub
+# Fórmula Hub
 
 ![Python Version](https://img.shields.io/badge/python-3.9%2B-blue?style=for-the-badge&logo=python)
 ![Framework](https://img.shields.io/badge/flask-2.0%2B-green?style=for-the-badge&logo=flask)
@@ -11,9 +11,6 @@
 
 <p align="center">
   </p>
-
-Desarrollado con ❤️ por **DiversoLab** en la **Universidad de Sevilla**.
-
 ---
 
 ## 📋 Tabla de Contenidos
@@ -21,23 +18,20 @@ Desarrollado con ❤️ por **DiversoLab** en la **Universidad de Sevilla**.
 - [✨ Características](#-características)
 - [🔧 Requisitos Previos](#-requisitos-previos)
 - [🚀 Instalación y Configuración](#-instalación-y-configuración)
-- [🎮 Comandos Principales](#-comandos-principales)
 - [📁 Estructura del Proyecto](#-estructura-del-proyecto)
 - [📚 Documentación Adicional](#-documentación-adicional)
 - [🤝 Contribuir](#-contribuir)
-- [🐛 Solución de Problemas](#-solución-de-problemas)
 - [👥 Equipo y Licencia](#-equipo)
 
 ---
 
 ## ✨ Características
 
-- 📊 **Gestión de Datasets de Materiales**: Almacenamiento estructurado de propiedades de materiales (CSV).
-- 🔍 **Sistema de Recomendaciones**: Descubrimiento inteligente de datasets relacionados basados en tags, autores y propiedades.
+- 📊 **Gestión de Datasets de Fórmula**: Almacenamiento estructurado dataset de fórmula 1 (UVL, CSV).
 - 👥 **Gestión de Usuarios**: Sistema completo de autenticación y perfiles de usuario.
 - 🌐 **Integración Zenodo**: Publicación directa de datasets con generación de DOI.
 - 🧪 **Testing Completo**: Suite robusta de tests unitarios, de integración y E2E.
-- 🎨 **UI Moderna**: Interfaz responsive y accesible basada en Bootstrap.
+- 🎨 **UI Moderna**: Interfaz responsive y accesible.
 
 ---
 
@@ -45,13 +39,12 @@ Desarrollado con ❤️ por **DiversoLab** en la **Universidad de Sevilla**.
 
 Asegúrate de tener instalado lo siguiente antes de empezar:
 
-* **Lenguajes:** Python 3.9+, Node.js & npm.
-* **Base de Datos:** MariaDB o MySQL (10.5+).
+* **Lenguajes:** Python 3.9+
+* **Base de Datos:** MariaDB (10.5+).
 * **Control de Versiones:** Git.
 
 ### Opcional
 * **Docker:** Para despliegue contenerizado.
-* **mysqldump:** Para copias de seguridad automáticas.
 
 ---
 
@@ -62,8 +55,8 @@ Sigue estos pasos para levantar el entorno de desarrollo local.
 ### 1. Clonar el Repositorio
 
 ```bash
-git clone [https://github.com/tu-usuario/materials-hub.git](https://github.com/tu-usuario/materials-hub.git)
-cd materials-hub
+git clone [https://github.com/Formula-hub2/formula-hub.git](https://github.com/Formula-hub2/formula-hub.git)
+cd formula-hub
 ````
 
 ### 2\. Configurar Entorno Virtual
@@ -91,18 +84,38 @@ Crea un archivo `.env` en la raíz y configura:
 
 ```ini
 # Configuración de la Aplicación
-FLASK_APP_NAME=MaterialsHub
+FLASK_APP_NAME="UVLHUB.IO(dev)"
 FLASK_ENV=development
-DOMAIN=localhost
-SECRET_KEY=cambia-esto-por-una-clave-segura
+DOMAIN=localhost:5000
 
-# Base de Datos
+#Configuración de la base de datos
 MARIADB_HOSTNAME=localhost
 MARIADB_PORT=3306
-MARIADB_USER=root
-MARIADB_PASSWORD=tu-password
 MARIADB_DATABASE=uvlhubdb
+MARIADB_TEST_DATABASE=uvlhubdb_test
+MARIADB_USER=uvlhubdb_user
+MARIADB_PASSWORD=tu-password
+MARIADB_ROOT_PASSWORD=tu-password
 
+# Directorio de trabajo
+WORKING_DIR=
+
+```
+
+### 5\. Inicializar Base de Datos
+
+Primero, crea la base de datos en tu servidor SQL:
+SQL
+
+```bash
+CREATE DATABASE uvlhubdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+Luego, utiliza nuestro CLI Rosemary para configurar las tablas y poblar datos:
+
+```bash
+flask db:upgrade
+rosemary db:seed
 ```
 
 ### 6\. Ejecutar la Aplicación
@@ -145,9 +158,6 @@ pytest --cov=app --cov-report=html
 # Tests de carga (Locust)
 locust --host=http://localhost:5000
 
-# Linter y Formateo
-rosemary linter          # Comprobar errores (flake8)
-rosemary linter:fix      # Arreglar formato (black + isort)
 ```
 
 ### 🛠️ Generadores y Utilidades
@@ -168,7 +178,7 @@ rosemary clear:cache
 ## 📁 Estructura del Proyecto
 
 ```text
-materials-hub/
+formula-hub/
 ├── app/                  # Núcleo de la aplicación Flask
 │   ├── modules/          # Arquitectura modular
 │   │   ├── auth/         # Login, Registro, Perfil
@@ -195,11 +205,8 @@ materials-hub/
 
 Documentación técnica detallada para desarrolladores:
 
-  - 🗃️ **[Guía de Configuración de Base de Datos](https://www.google.com/search?q=docs/database_setup_guide.md)**
-  - 🎣 **[Guía de Pre-commit Hooks](https://www.google.com/search?q=docs/pre-commit-hooks-guide.md)**
-  - 🧬 **[Especificación Materials Dataset](https://www.google.com/search?q=docs/materials_dataset_implementation_summary.md)**
-  - 🧪 **[Guía de Testing](https://www.google.com/search?q=docs/testing_guide.md)**
-  - 🔌 **[Documentación API](https://www.google.com/search?q=docs/api_documentation.md)**
+  - 🎣 **[Guía de Pre-commit Hooks](docs/pre-commit-hooks-guide.md)**
+  - 🧪 **[Guía de ciclo CI/CD](docs/cicd-guide.md)**
 
 -----
 
@@ -217,53 +224,15 @@ Documentación técnica detallada para desarrolladores:
 
 -----
 
-## 🐛 Solución de Problemas
-
-\<details\>
-\<summary\>🔴 Error de conexión a Base de Datos\</summary\>
-
-1.  Verifica que el servicio esté corriendo: `sudo systemctl status mariadb`.
-2.  Comprueba las credenciales en `.env` ejecutando: `rosemary env`.
-3.  Intenta conectar manualmente: `rosemary db:console`.
-
-\</details\>
-
-\<details\>
-\<summary\>🟡 Conflictos en Migraciones\</summary\>
-
-Si la base de datos está desincronizada en desarrollo:
-
-```bash
-rosemary db:reset --clear-migrations -y
-rosemary db:setup -y
-```
-
-*(Nota: Esto borrará los datos locales).*
-
-\</details\>
-
-\<details\>
-\<summary\>🔵 Dependencias Faltantes\</summary\>
-
-```bash
-pip install -r requirements.txt --force-reinstall
-npm install
-```
-
-\</details\>
-
------
-
 ## 👥 Equipo
 
-Desarrollado por **DiversoLab** - Universidad de Sevilla.
+  * [GitHub Profile](https://github.com/Formula-hub2/formula-hub)
+  * [Issues](https://github.com/Formula-hub2/formula-hub/issues)
+  * [KANBAN](https://github.com/orgs/Formula-hub2/projects/1)
 
-  * [GitHub Profile](https://github.com/tu-usuario/materials-hub)
-  * [Issues](https://github.com/tu-usuario/materials-hub/issues)
+## 📝 Documentación oficial
 
-## 📝 Licencia
-
-Este proyecto está bajo la licencia **MIT**. Consulta el archivo [LICENSE](https://www.google.com/search?q=LICENSE) para más detalles.
+You can consult the official documentation of the project at [docs.uvlhub.io](https://docs.uvlhub.io/).
 
 ```
 ```
