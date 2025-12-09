@@ -47,6 +47,8 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("two_factor_enabled", sa.Boolean(), nullable=True),
         sa.Column("two_factor_secret", sa.String(length=32), nullable=True),
+        sa.Column("failed_login_attempts", sa.Integer(), nullable=True),
+        sa.Column("last_failed_login", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email"),
     )

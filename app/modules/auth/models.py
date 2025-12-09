@@ -23,6 +23,9 @@ class User(db.Model, UserMixin):
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32), nullable=True)
 
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    last_failed_login = db.Column(db.DateTime, nullable=True)
+
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
         if "password" in kwargs:

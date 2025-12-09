@@ -1,4 +1,8 @@
+import os
+
 from flask import flash, redirect, render_template, request, session, url_for
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_login import current_user, login_user, logout_user
 
 # Necesario para el locust test de 2FA
@@ -9,6 +13,11 @@ from app.modules.auth.forms import LoginForm, SignupForm
 from app.modules.auth.models import User
 from app.modules.auth.services import AuthenticationService
 from app.modules.profile.services import UserProfileService
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=os.environ.get("FLASK_RATELIMIT_STORAGE_URI", "memory://"),
+)
 
 authentication_service = AuthenticationService()
 user_profile_service = UserProfileService()
@@ -38,6 +47,7 @@ def show_signup_form():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("public.index"))
@@ -45,6 +55,22 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         user = authentication_service.get_user_by_email(form.email.data)
+
+        if not user:
+            return render_template("auth/login_form.html", form=form, error="Invalid credentials")
+
+        if user and authentication_service.repository.is_account_blocked(user):
+            remaining_seconds = authentication_service.get_remaining_seconds(user)
+            return (
+                render_template(
+                    "auth/login_form.html",
+                    form=form,
+                    countdown=remaining_seconds,
+                    error="Demasiados intentos fallidos. Cuenta bloqueada.",
+                ),
+                429,
+            )
+
         if user and authentication_service.verify_password(user, form.password.data):
             if getattr(user, "two_factor_enabled", False):
                 session["two_factor_user_id"] = user.id
@@ -58,6 +84,7 @@ def login():
                 device_id = str(uuid.uuid4())
             ###############################################
             login_user(user, remember=True)
+            authentication_service.repository.reset_failed_attempts(user)
             # --- Crear registro de sesión ---
             user_session = authentication_service.create_user_session(user)
             session["session_id"] = user_session.session_id
@@ -67,6 +94,20 @@ def login():
             resp = make_response(redirect(url_for("public.index")))
             resp.set_cookie("device_id", device_id, max_age=60 * 60 * 24 * 365 * 2, httponly=True, secure=True)
             return resp
+
+        authentication_service.repository.register_failed_attempt(user)
+
+        if user and authentication_service.repository.is_account_blocked(user):
+            remaining_seconds = authentication_service.get_remaining_seconds(user)
+            return (
+                render_template(
+                    "auth/login_form.html",
+                    form=form,
+                    countdown=remaining_seconds,
+                    error="Demasiados intentos fallidos. Cuenta bloqueada.",
+                ),
+                429,
+            )
 
         return render_template("auth/login_form.html", form=form, error="Invalid credentials")
 
@@ -136,3 +177,10 @@ def terminate_session(session_id):
     authentication_service.terminate_session(session_id)
     flash("Sesión cerrada correctamente.")
     return redirect(url_for("auth.sesiones_activas"))
+
+
+@auth_bp.errorhandler(429)
+def ratelimit_handler(e):
+    form = LoginForm()
+
+    return render_template("auth/login_form.html", form=form, countdown=60), 429

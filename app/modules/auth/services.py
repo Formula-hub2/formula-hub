@@ -1,5 +1,6 @@
 import os
 import uuid
+from datetime import datetime, timedelta
 
 from flask import request
 from flask_login import current_user, login_user
@@ -19,9 +20,19 @@ class AuthenticationService(BaseService):
 
     def login(self, email, password, remember=True):
         user = self.repository.get_by_email(email)
-        if user is not None and user.check_password(password):
+
+        if user is None:
+            return False
+
+        if self.repository.is_account_blocked(user):
+            return False
+
+        if user.check_password(password):
             login_user(user, remember=remember)
+            self.repository.reset_failed_attempts(user)
             return True
+
+        self.repository.register_failed_attempt(user)
         return False
 
     def is_email_available(self, email: str) -> bool:
@@ -121,3 +132,12 @@ class AuthenticationService(BaseService):
         """Elimina todas las sesiones del usuario excepto la actual."""
         UserSession.query.filter(UserSession.user_id == user.id, UserSession.session_id != current_session_id).delete()
         self.repository.session.commit()
+
+    def get_remaining_seconds(self, user):
+        if user.failed_login_attempts >= 5 and user.last_failed_login:
+            time_since_fail = datetime.utcnow() - user.last_failed_login
+
+            if time_since_fail < timedelta(seconds=60):
+                return int(60 - time_since_fail.total_seconds())
+
+        return 0

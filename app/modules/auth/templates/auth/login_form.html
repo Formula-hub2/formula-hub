@@ -54,10 +54,17 @@
 
                     <div class="row">
 
+                    <div class="row">
                         <div class="col-lg-6 col-12">
+                        {% if countdown %}
+                            <div class="alert alert-warning mt-2">
+                            Has superado el número máximo de intentos.<br>
+                            Podrás volver a intentarlo en <span id="countdown">{{ countdown }}</span> segundos.
+                            </div>
+                        {% else %}
                             {{ form.submit(class="btn btn-primary") }}
+                        {% endif %}
                         </div>
-
                     </div>
 
                     <div class="row">
@@ -91,5 +98,26 @@
 {% endblock %}
 
 {% block scripts %}
+  {% if countdown %}
+  <script>
+    const countdownElem = document.getElementById("countdown");
+
+    let seconds = parseInt(countdownElem.innerText || countdownElem.textContent);
+
+    const updateDisplay = () => {
+        countdownElem.textContent = seconds;
+    };
+
+    const timer = setInterval(() => {
+        seconds--;
+        updateDisplay();
+        if (seconds <= 0) {
+            clearInterval(timer);
+            window.location.reload();
+        }
+    }, 1000);
+  </script>
+  {% endif %}
+
     <script src="{{ url_for('auth.scripts') }}"></script>
 {% endblock %}

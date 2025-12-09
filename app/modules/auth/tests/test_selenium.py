@@ -1,9 +1,11 @@
 import time
 
 import pyotp
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from app import create_app  # <--- IMPORTANTE: Necesitas esto
 from app.modules.auth.repositories import UserRepository
@@ -49,11 +51,6 @@ def test_login_and_check_element():
 
         # Close the browser
         close_driver(driver)
-
-
-# VUELVE A EJECUTAR LA MISMA FUNCION
-# Call the test function
-# test_login_and_check_element()
 
 
 def test_login_with_2fa_selenium():
@@ -152,3 +149,82 @@ def test_login_with_2fa_selenium():
             print(f"⚠️ [TEARDOWN ERROR] No se pudo limpiar la DB: {e}")
 
         close_driver(driver)
+
+
+def test_limiter_selenium():
+    driver = initialize_driver()
+    wait = WebDriverWait(driver, 5)
+
+    try:
+        host = get_host_for_selenium_testing()
+        login_url = f"{host}/login"
+        driver.get(login_url)
+
+        target_email = "user1@example.com"
+
+        print("Iniciando prueba de fuerza bruta...")
+
+        for i in range(1, 6):
+            print(f"Intento fallido #{i}")
+
+            try:
+                email_field = wait.until(EC.presence_of_element_located((By.NAME, "email")))
+                password_field = driver.find_element(By.NAME, "password")
+            except TimeoutException:
+
+                print(f"Alerta: No se encontró el campo email en el intento {i}. ¿Bloqueado antes de tiempo?")
+                break
+
+            email_field.clear()
+            email_field.send_keys(target_email)
+
+            password_field.clear()
+            password_field.send_keys(f"wrong_password_{i}")
+
+            password_field.send_keys(Keys.RETURN)
+
+            time.sleep(0.5)
+
+        print("Intento #6 (Debe estar bloqueado)...")
+
+        try:
+            email_field = wait.until(EC.presence_of_element_located((By.NAME, "email")))
+            password_field = driver.find_element(By.NAME, "password")
+
+            email_field.clear()
+            email_field.send_keys(target_email)
+            password_field.send_keys("1234")
+            password_field.send_keys(Keys.RETURN)
+
+            time.sleep(2)
+
+        except TimeoutException:
+            print("El formulario de login ya no aparece. Bloqueo exitoso.")
+
+        try:
+            wait_short = WebDriverWait(driver, 2)
+            wait_short.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//h1[contains(@class, 'h2 mb-3') and contains(., 'Latest datasets')]")
+                )
+            )
+            raise AssertionError("FALLO DE SEGURIDAD: El usuario pudo entrar en el 6to intento.")
+        except TimeoutException:
+            print("Correcto: El usuario no pudo acceder al dashboard.")
+
+        body_text = driver.find_element(By.TAG_NAME, "body").text
+        expected_errors = ["Too many failed attempts", "blocked", "Try again later", "bloqueada"]
+
+        if any(error in body_text for error in expected_errors):
+            print("Test passed! Mensaje de bloqueo detectado.")
+        else:
+            print("Advertencia: Acceso denegado confirmado, pero sin mensaje explícito.")
+
+    finally:
+        close_driver(driver)
+
+
+# Call the test function
+# test_login_and_check_element()
+# test_login_with_2fa_selenium()
+# test_limiter_selenium()
