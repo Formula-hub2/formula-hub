@@ -1,3 +1,5 @@
+import uuid
+
 import pyotp
 from locust import HttpUser, TaskSet, events, task
 
@@ -61,6 +63,11 @@ class AuthUser(HttpUser):
 # --- CONSTANTES DE CONFIGURACIÓN ---
 USER_EMAIL = "user4@example.com"
 USER_PASSWORD = "1234"
+
+# --- CONSTANTES PARA SESIONES ACTIVAS ---
+USER_EMAIL_SESSIONS = "sessions_user@example.com"
+USER_PASSWORD_SESSIONS = "12345678"
+
 # Definimos un secreto FIJO aquí. El script forzará que la DB tenga este valor al iniciar.
 FIXED_SECRET = "VHZHTPR5ZSXR564A2XTZ56JSLUA4XNYK"
 
@@ -72,7 +79,7 @@ def on_test_start(environment, **kwargs):
     Este método se ejecuta antes de empezar el test de carga.
     Se conecta a la DB, crea user4 si no existe y le ASIGNA el secreto fijo.
     """
-    print("🚀 [SETUP] Iniciando preparación de datos para User4...")
+    print("🚀 [SETUP] Iniciando preparación de datos para los usuarios...")
 
     flask_app = create_app()
     with flask_app.app_context():
@@ -105,6 +112,19 @@ def on_test_start(environment, **kwargs):
         else:
             print("✅ [SETUP] El usuario ya estaba configurado correctamente.")
 
+        user_sessions = repo.get_by_email(USER_EMAIL_SESSIONS)
+        if not user_sessions:
+            print(f"👤 [SETUP] Creando usuario sesiones {USER_EMAIL_SESSIONS}...")
+            user_sessions = repo.create(email=USER_EMAIL_SESSIONS, password=USER_PASSWORD_SESSIONS)
+            repo.session.commit()
+            print(f"✅ [SETUP] Usuario sesiones {USER_EMAIL_SESSIONS} creado.")
+
+        # Asegurar que NO tiene 2FA habilitado
+        if getattr(user_sessions, "two_factor_enabled", False):
+            print("🛡️ [SETUP] Deshabilitando 2FA para usuario de sesiones activas...")
+            user_sessions.two_factor_enabled = False
+            repo.session.commit()
+
 
 # --- TEARDOWN FINAL (SE EJECUTA AL TERMINAR) ---
 @events.test_stop.add_listener
@@ -118,10 +138,63 @@ def on_test_stop(environment, **kwargs):
     flask_app = create_app()
     with flask_app.app_context():
         repo = UserRepository()
-        user = repo.get_by_email(USER_EMAIL)
 
+        # 1. Limpiar usuario para sesiones activas
+        user_sessions = repo.get_by_email(USER_EMAIL_SESSIONS)
+        if user_sessions:
+            print(f"🧹 [TEARDOWN] Limpiando usuario sesiones {USER_EMAIL_SESSIONS}...")
+
+            # A. Buscar y eliminar perfil usando query directa
+            try:
+                from app.modules.profile.models import UserProfile
+
+                profile = UserProfile.query.filter_by(user_id=user_sessions.id).first()
+                if profile:
+                    print(f"🧹 [TEARDOWN] Eliminando perfil ID {profile.id}...")
+                    repo.session.delete(profile)
+                    repo.session.commit()
+            except Exception as e:
+                print(f"⚠️ [TEARDOWN] Error eliminando perfil sesiones: {e}")
+                repo.session.rollback()
+
+            # B. Eliminar sesiones
+            if hasattr(user_sessions, "sessions") and user_sessions.sessions:
+                try:
+                    print(f"🧹 [TEARDOWN] Borrando {len(user_sessions.sessions)} sesiones activas...")
+                    for session in user_sessions.sessions:
+                        repo.session.delete(session)
+                    repo.session.commit()
+                except Exception as e:
+                    print(f"⚠️ [TEARDOWN] Error borrando sesiones: {e}")
+                    repo.session.rollback()
+
+            # C. Finalmente eliminar el usuario
+            try:
+                repo.delete(user_sessions.id)
+                print(f"🗑️ [TEARDOWN] Usuario sesiones {USER_EMAIL_SESSIONS} eliminado correctamente.")
+            except Exception as e:
+                print(f"❌ [TEARDOWN] Error eliminando usuario sesiones: {e}")
+                print("ℹ️  [TEARDOWN] El usuario podría tener referencias pendientes.")
+
+        # 2. Limpiar usuario 2FA
+        user = repo.get_by_email(USER_EMAIL)
         if user:
-            # Como el modelo no tiene cascade delete, primero borramos sus sesiones manualmente
+            print(f"🧹 [TEARDOWN] Limpiando usuario 2FA {USER_EMAIL}...")
+
+            # A. Buscar y eliminar perfil usando query directa
+            try:
+                from app.modules.profile.models import UserProfile
+
+                profile = UserProfile.query.filter_by(user_id=user.id).first()
+                if profile:
+                    print(f"🧹 [TEARDOWN] Eliminando perfil ID {profile.id}...")
+                    repo.session.delete(profile)
+                    repo.session.commit()
+            except Exception as e:
+                print(f"⚠️ [TEARDOWN] Error eliminando perfil 2FA: {e}")
+                repo.session.rollback()
+
+            # B. Eliminar sesiones
             if hasattr(user, "sessions") and user.sessions:
                 try:
                     print(f"🧹 [TEARDOWN] Borrando {len(user.sessions)} sesiones activas...")
@@ -129,12 +202,16 @@ def on_test_stop(environment, **kwargs):
                         repo.session.delete(session)
                     repo.session.commit()
                 except Exception as e:
-                    print(f"⚠️ [TEARDOWN] Error borrando sesiones: {e}")
+                    print(f"⚠️ [TEARDOWN] Error borrando sesiones 2FA: {e}")
                     repo.session.rollback()
 
-            # Ahora ya podemos borrar el usuario seguro
-            repo.delete(user.id)
-            print(f"🗑️ [TEARDOWN] Usuario {USER_EMAIL} eliminado correctamente.")
+            # C. Finalmente eliminar el usuario
+            try:
+                repo.delete(user.id)
+                print(f"🗑️ [TEARDOWN] Usuario {USER_EMAIL} eliminado correctamente.")
+            except Exception as e:
+                print(f"❌ [TEARDOWN] Error eliminando usuario 2FA: {e}")
+                print("ℹ️  [TEARDOWN] El usuario podría tener referencias pendientes.")
         else:
             print(f"ℹ️ [TEARDOWN] El usuario {USER_EMAIL} no se encontró (¿ya eliminado?).")
 
@@ -201,4 +278,111 @@ class AuthUser2FA(HttpUser):
     tasks = [TwoFactorLoginBehavior]
     min_wait = 5000
     max_wait = 9000
+    host = get_host_for_locust_testing()
+
+
+# TEST DE CARGA DE ACTIVE SESSIONS
+class ActiveSessionsBehavior(TaskSet):
+    def on_start(self):
+        self.ensure_logged_out()
+        self.login()
+
+    def ensure_logged_out(self):
+        self.client.get("/logout")
+        self.client.cookies.clear()
+
+    def login(self):
+        response = self.client.get("/login")
+        if response.status_code != 200:
+            return False
+
+        try:
+            csrf_token = get_csrf_token(response)
+        except ValueError:
+            return False
+
+        device_id = str(uuid.uuid4())
+
+        response = self.client.post(
+            "/login",
+            data={"email": USER_EMAIL_SESSIONS, "password": USER_PASSWORD_SESSIONS, "csrf_token": csrf_token},
+            headers={"User-Agent": f"Locust-Test-Agent/{device_id}", "Referer": self.user.host + "/login"},
+        )
+
+        if response.status_code == 200 or response.status_code == 302:
+            response = self.client.get("/")
+            if response.status_code == 200:
+                return True
+        return False
+
+    @task
+    def view_active_sessions(self):
+        response = self.client.get("/active_sessions")
+
+        if response.status_code == 200:
+            import re
+
+            session_ids = re.findall(r'session_id[\'"]?\s*:\s*[\'"]([^\'"]+)[\'"]', response.text)
+            if session_ids:
+                self.session_ids = session_ids
+        elif response.status_code == 401:
+            self.login()
+
+    @task
+    def create_multiple_sessions(self):
+        import random
+
+        devices = [
+            {"agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+            {"agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+            {"agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)"},
+        ]
+
+        device = random.choice(devices)
+
+        response = self.client.get("/login")
+        try:
+            csrf_token = get_csrf_token(response)
+        except ValueError:
+            return
+
+        response = self.client.post(
+            "/login",
+            data={"email": USER_EMAIL_SESSIONS, "password": USER_PASSWORD_SESSIONS, "csrf_token": csrf_token},
+            headers={"User-Agent": device["agent"], "Referer": self.user.host + "/login"},
+        )
+
+    @task
+    def terminate_specific_session(self):
+        response = self.client.get("/active_sessions")
+
+        if response.status_code != 200:
+            if self.login():
+                response = self.client.get("/active_sessions")
+
+        if response.status_code == 200:
+            import re
+
+            session_ids = re.findall(r'data-session-id[\'"]?\s*[:=]\s*[\'"]([^\'"]+)[\'"]', response.text)
+            if not session_ids:
+                session_ids = re.findall(r"session-(\w{8}-\w{4}-\w{4}-\w{4}-\w{12})", response.text)
+
+            if session_ids and len(session_ids) > 1:
+                session_id = session_ids[0]
+                terminate_url = f"/terminate_session/{session_id}"
+                response = self.client.get(terminate_url, allow_redirects=False)
+
+    @task
+    def navigation_with_active_sessions(self):
+        import random
+
+        pages = ["/", "/active_sessions", "/login"]
+        page = random.choice(pages)
+        self.client.get(page)
+
+
+class ActiveSessionsUser(HttpUser):
+    tasks = [ActiveSessionsBehavior]
+    min_wait = 3000
+    max_wait = 8000
     host = get_host_for_locust_testing()
