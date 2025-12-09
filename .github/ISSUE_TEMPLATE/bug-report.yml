@@ -1,7 +1,7 @@
 name: "🐛 Bug Report"
-description: "Report a bug or issue in FormulaHub"
-title: "[BUG] "
-labels: ["bug", "needs-review"]
+description: "Report a bug in FormulaHub"
+title: "[Fix] "
+labels: ["Fix", "needs-review"]
 assignees: []
 projects: ["Formula-hub2"]
 body:
@@ -10,6 +10,8 @@ body:
       value: |
         # 🐛 Report a Bug
         Thanks for helping us improve FormulaHub2! Please fill out this form completely so we can fix the issue quickly.
+
+        ---
 
   - type: input
     id: short-description

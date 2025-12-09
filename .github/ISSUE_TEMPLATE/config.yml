@@ -1,0 +1,16 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: "❓ Questions & Help"
+    url: https://github.com/Formula-hub2/formula-hub/discussions
+    about: "Ask questions or get help in our Discussions"
+
+  - name: "📚 Documentation"
+    url: https://github.com/Formula-hub2/formula-hub#readme
+    about: "Check our official documentation"
+
+# Orden de aparición de las plantillas
+template_order:
+  - bug-report.yml
+  - feature-request.yml
+  - development-task.yml
