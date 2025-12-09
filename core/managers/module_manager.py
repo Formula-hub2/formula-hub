@@ -33,6 +33,10 @@ class ModuleManager:
             if module_name in self.ignored_modules:
                 continue
 
+            if not module_name.isidentifier():
+                print(f"Error: Invalid module name '{module_name}'")
+                continue
+
             module_path = os.path.join(self.modules_dir, module_name)
             if (
                 os.path.isdir(module_path)
@@ -50,6 +54,9 @@ class ModuleManager:
                     print(f"Error registering modules: Could not load the module " f"for Module '{module_name}': {e}")
 
     def register_module(self, module_name):
+        if not module_name.isidentifier():
+            print(f"Error: Invalid module name '{module_name}'")
+            return
         module_path = os.path.join(self.modules_dir, module_name)
         if os.path.isdir(module_path) and not module_name.startswith("__"):
             try:
@@ -80,6 +87,9 @@ class ModuleManager:
     def get_modules(self):
         all_modules = []
         for module_name in os.listdir(self.modules_dir):
+            if not module_name.isidentifier():
+                print(f"⚠️ El módulo '{module_name}' fue ignorado porque su nombre es inválido o inseguro.")
+                continue
             module_path = os.path.join(self.modules_dir, module_name)
             if (
                 os.path.isdir(module_path)

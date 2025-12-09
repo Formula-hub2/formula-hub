@@ -13,6 +13,8 @@ class ExploreService(BaseService):
         super().__init__(ExploreRepository())
 
     def filter(self, query="", sorting="newest", publication_type="any", tags=[], **kwargs):
+        if tags is None:
+            tags = []
         return self.repository.filter(query, sorting, publication_type, tags, **kwargs)
 
     def generate_zip_from_cart(self, dataset_ids):
@@ -53,7 +55,8 @@ class ExploreService(BaseService):
                                 zf.write(path_flat, f"{dataset.id}_{file_name}")
                                 break
 
-                except Exception:
+                except Exception as e:
+                    current_app.logger.error(f"Error al añadir dataset {dataset_id} al zip: {str(e)}")
                     continue
 
         memory_file.seek(0)

@@ -117,7 +117,7 @@ class ZenodoService(BaseService):
             success = False
 
         # Step 3: Delete the deposition
-        response = requests.delete(f"{self.ZENODO_API_URL}/{deposition_id}", params=self.params)
+        response = requests.delete(f"{self.ZENODO_API_URL}/{deposition_id}", params=self.params, timeout=30)
 
         if os.path.exists(file_path):
             os.remove(file_path)
