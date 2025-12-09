@@ -54,7 +54,6 @@ def test_login_and_check_element():
         close_driver(driver)
 
 
-
 # 2
 def test_login_with_2fa_selenium():
     driver = initialize_driver()

@@ -1,4 +1,5 @@
 import random
+import re
 import uuid
 
 import pyotp
@@ -321,7 +322,6 @@ class ActiveSessionsBehavior(TaskSet):
         response = self.client.get("/active_sessions")
 
         if response.status_code == 200:
-            import re
 
             session_ids = re.findall(r'session_id[\'"]?\s*:\s*[\'"]([^\'"]+)[\'"]', response.text)
             if session_ids:
@@ -362,7 +362,6 @@ class ActiveSessionsBehavior(TaskSet):
                 response = self.client.get("/active_sessions")
 
         if response.status_code == 200:
-            import re
 
             session_ids = re.findall(r'data-session-id[\'"]?\s*[:=]\s*[\'"]([^\'"]+)[\'"]', response.text)
             if not session_ids:
@@ -390,114 +389,65 @@ class ActiveSessionsUser(HttpUser):
 
 
 # --- TEST LOGIN BRUTE FORCE ---
-from locust import HttpUser, task, between, events
-import re
-import random
-import uuid
 
 # --- CONFIGURACIÓN ---
-USER_LOAD = "load_user@locust.com"      
-USER_BRUTE = "brute_user@locust.com"    
+USER_LOAD = "load_user@locust.com"
+USER_BRUTE = "brute_user@locust.com"
 COMMON_PASSWORD = "1234"
 INVALID_PASSWORD = "wrong_pass_"
 
-# --- SETUP: CREACIÓN DE USUARIOS EN BD ---
-@events.test_start.add_listener
-def on_test_start(environment, **kwargs):
-    from app import create_app
-    from app.modules.auth.repositories import UserRepository
-    
-    print("🚀 [SETUP] Creando usuarios de prueba...")
-    app = create_app()
-    with app.app_context():
-        repo = UserRepository()
-        
-        # 1. Crear Usuario de Carga (Limpio)
-        user1 = repo.get_by_email(USER_LOAD)
-        if not user1:
-            repo.create(email=USER_LOAD, password=COMMON_PASSWORD)
-        else:
-            user1.failed_login_attempts = 0
-            user1.last_failed_login = None
-            repo.session.add(user1)
-            repo.session.commit()
-
-        # 2. Crear Usuario para Fuerza Bruta
-        user2 = repo.get_by_email(USER_BRUTE)
-        if not user2:
-            repo.create(email=USER_BRUTE, password=COMMON_PASSWORD)
-        else:
-            user2.failed_login_attempts = 0
-            user2.last_failed_login = None
-            repo.session.add(user2)
-            repo.session.commit()
-            
-    print("✅ [SETUP] Usuarios listos.")
-
-# --- HELPER: EXTRACCIÓN ROBUSTA DE CSRF ---
-def get_csrf_token(response):
-    """
-    Busca el token CSRF de forma flexible.
-    """
-    pattern = r'<input[^>]*name="csrf_token"[^>]*value="([^"]+)"'
-    match = re.search(pattern, response.text)
-    
-    if match:
-        return match.group(1)
-    
-    if "Login" not in response.text and "Sign Up" not in response.text:
-        # Probablemente redirigió porque ya tenía sesión
-        return None 
-        
-    raise ValueError("CSRF token not found in HTML input.")
 
 class BaseLoginUser(HttpUser):
     # CORRECCIÓN 1: Marcamos esto como abstracto para que Locust no intente ejecutarlo directamente
     abstract = True
-    
+
     host = "http://localhost:5000"
     wait_time = between(1, 3)
-    
+
     def on_start(self):
         self.client.cookies.clear()
-        
+
     def get_login_page_token(self):
         """Obtiene la página de login y extrae el token. Maneja redirecciones."""
         response = self.client.get("/login", name="/login [GET]")
-        
+
         # Si nos redirige fuera del login, hacemos logout y reintentamos
         if response.url != f"{self.host}/login" and "/login" not in response.url:
             self.client.get("/logout")
             response = self.client.get("/login", name="/login [GET Retry]")
-            
+
         token = get_csrf_token(response)
         if token is None:
             # Si sigue sin haber token tras el reintento, forzamos logout de nuevo por si acaso
             self.client.get("/logout")
             response = self.client.get("/login", name="/login [GET Retry 2]")
             token = get_csrf_token(response)
-            
+
         return token
+
 
 class LoadTestUser(BaseLoginUser):
     """
     Usuario bueno: Siempre usa la contraseña correcta.
     """
+
     @task
     def login_success(self):
         try:
             token = self.get_login_page_token()
-            if not token: return
+            if not token:
+                return
         except ValueError as e:
             print(f"⚠️ [LoadUser] Skip: {e}")
             return
 
         # CORRECCIÓN 2: Usamos catch_response=True para manejar validaciones manuales
-        with self.client.post("/login", data={
-            "email": USER_LOAD,
-            "password": COMMON_PASSWORD,
-            "csrf_token": token
-        }, name="Login Success", catch_response=True) as response:
+        with self.client.post(
+            "/login",
+            data={"email": USER_LOAD, "password": COMMON_PASSWORD, "csrf_token": token},
+            name="Login Success",
+            catch_response=True,
+        ) as response:
 
             if response.status_code == 200 and "/login" not in response.url:
                 response.success()
@@ -507,31 +457,35 @@ class LoadTestUser(BaseLoginUser):
             else:
                 response.failure(f"Fallo login legítimo: {response.status_code}")
 
+
 class BruteForceUser(BaseLoginUser):
     """
     Atacante: Intenta contraseñas erróneas. Esperamos que sea bloqueado (429).
     """
+
     @task
     def login_bruteforce(self):
         try:
             token = self.get_login_page_token()
-            if not token: return
+            if not token:
+                return
         except ValueError as e:
-            return
+            return e
 
         fake_pass = f"{INVALID_PASSWORD}{random.randint(1, 9999)}"
-        
+
         # CORRECCIÓN 3: catch_response=True es obligatorio para usar .success() o .failure()
-        with self.client.post("/login", data={
-            "email": USER_BRUTE,
-            "password": fake_pass,
-            "csrf_token": token
-        }, name="Login BruteForce", catch_response=True) as response:
+        with self.client.post(
+            "/login",
+            data={"email": USER_BRUTE, "password": fake_pass, "csrf_token": token},
+            name="Login BruteForce",
+            catch_response=True,
+        ) as response:
 
             if response.status_code == 429:
                 # ¡ÉXITO! El sistema nos bloqueó como debía.
                 # Marcamos la petición como Exitosa en Locust aunque sea un error HTTP.
-                response.success() 
+                response.success()
             elif response.status_code == 200 and "Invalid credentials" in response.text:
                 # Fallo normal de contraseña (aún no bloqueado). Es un comportamiento esperado.
                 response.success()
