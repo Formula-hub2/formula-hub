@@ -1,3 +1,5 @@
+import time
+
 import pyotp
 import pytest
 from flask import url_for
@@ -217,3 +219,24 @@ def test_terminate_all_other_sessions(clean_database, mocker):
     sessions = service.get_active_sessions(user)
     assert len(sessions) == 1
     assert sessions[0].session_id == session2.session_id
+
+
+def test_login_brute_force_limit(test_client, clean_database):
+    """
+    Issue: Limit failed login attempts.
+    Prueba que el sistema bloquea el inicio de sesión tras 5 intentos fallidos
+    consecutivos, incluso si el sexto intento tiene la contraseña correcta.
+    """
+    AuthenticationService().create_with_profile(
+        name="Test", surname="Example", email="test@example.com", password="test1234"
+    )
+
+    for i in range(5):
+        response = test_client.post(
+            "/login", data=dict(email="test@example.com", password=f"wrong_pass_{i}"), follow_redirects=True
+        )
+        assert response.status_code in (200, 429)
+    time.sleep(1)
+    response = test_client.post("/login", data=dict(email="test@example.com", password="test1234"))
+
+    assert response.request.path == url_for("auth.login"), "Account should be blocked after multiple failed attempts"

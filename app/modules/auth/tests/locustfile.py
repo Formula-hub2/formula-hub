@@ -1,7 +1,8 @@
+import random
 import uuid
 
 import pyotp
-from locust import HttpUser, TaskSet, events, task
+from locust import HttpUser, TaskSet, between, events, task
 
 from app import create_app
 from app.modules.auth.repositories import UserRepository
@@ -386,3 +387,99 @@ class ActiveSessionsUser(HttpUser):
     min_wait = 3000
     max_wait = 8000
     host = get_host_for_locust_testing()
+
+
+VALID_USER = "user4@example.com"
+VALID_PASSWORD = "1234"
+INVALID_PASSWORD = "wrong_password_"
+
+
+class LoginUser(HttpUser):
+    """
+    Clase base para simular un usuario en la aplicación.
+    """
+
+    host = "http://localhost:5000"
+
+    wait_time = between(1, 2.5)
+
+    def on_start(self):
+        self.client.cookies.clear()
+        self.device_id = str(uuid.uuid4())
+        self.client.headers = {"User-Agent": f"LocustTestUser/{self.device_id}"}
+
+    @task(1)
+    def load_login_page(self):
+        """Simula la carga de la página GET /login"""
+        self.client.get("/login", name="/login [GET]")
+
+
+class LoadTestUser(LoginUser):
+    """
+    Simula un usuario legítimo que inicia sesión correctamente.
+    """
+
+    @task(3)
+    def attempt_successful_login(self):
+
+        # 1. HACER GET para obtener el CSRF token y las cookies de sesión
+        response_get = self.client.get("/login", name="/login [GET]")
+        try:
+            csrf_token = get_csrf_token(response_get)
+        except ValueError as e:
+            # Si no encontramos el token, fallamos el test de forma explícita
+            response_get.failure(f"Error CSRF en GET: {e}")
+            return
+
+        # 2. POST con el CSRF token
+        login_data = {
+            "email": VALID_USER,
+            "password": VALID_PASSWORD,
+            "remember_me": "y",
+            "csrf_token": csrf_token,  # <-- AÑADIDO EL TOKEN
+        }
+
+        response = self.client.post("/login", data=login_data, name="/login [POST: Success]")
+
+        if response.status_code == 200 and "/login" not in response.url:
+            pass
+        elif response.status_code == 429:
+            response.failure(
+                "Login de carga bloqueado (429) - Demasiadas peticiones. La ruta podría estar sobrecargada."
+            )
+        else:
+            response.failure(f"Login fallido (Status: {response.status_code})")
+
+
+class BruteForceUser(LoginUser):
+    """
+    Simula un atacante que intenta fallar el login repetidamente.
+    """
+
+    @task(1)
+    def attempt_failed_login_and_check_block(self):
+
+        # 1. HACER GET para obtener el CSRF token
+        response_get = self.client.get("/login", name="/login [GET]")
+        try:
+            csrf_token = get_csrf_token(response_get)
+        except ValueError as e:
+            response_get.failure(f"Error CSRF en GET: {e}")
+            return
+
+        target_email = VALID_USER
+
+        # 2. POST con el CSRF token
+        fail_data = {
+            "email": target_email,
+            "password": f"{INVALID_PASSWORD}{random.randint(100, 999)}",
+            "remember_me": "n",
+            "csrf_token": csrf_token,  # <-- AÑADIDO EL TOKEN
+        }
+
+        response = self.client.post("/login", data=fail_data, name="/login [POST: Fail]")
+
+        if response.status_code == 429:
+            response.success()
+        elif response.status_code != 200:
+            response.failure(f"Fallo inesperado del servidor: {response.status_code}")

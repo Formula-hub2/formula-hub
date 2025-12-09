@@ -24,6 +24,7 @@ ConfigArgParse==1.7.1
 coverage==7.10.1
 cryptography==45.0.5
 dd==0.5.7
+Deprecated==1.3.1
 distlib==0.4.0
 dnspython==2.7.0
 docker==7.1.0
@@ -42,6 +43,7 @@ flamapy-sat==2.0.1
 flasgger==0.9.7.1
 Flask==3.1.1
 flask-cors==6.0.1
+Flask-Limiter==4.1.1
 Flask-Login==0.6.3
 Flask-Mail==0.10.0
 Flask-Migrate==4.1.0
@@ -67,6 +69,8 @@ Jinja2==3.1.6
 jsonschema==4.25.0
 jsonschema-specifications==2025.4.1
 kaitaistruct==0.10
+limiter==0.5.0
+limits==5.6.0
 locust==2.37.14
 locust-cloud==1.26.3
 Mako==1.3.10
@@ -78,6 +82,7 @@ msgspec==0.19.0
 mypy_extensions==1.1.0
 networkx==3.5
 nodeenv==1.9.1
+ordered-set==4.1.0
 outcome==1.3.0.post0
 packaging==25.0
 pathspec==0.12.1
@@ -113,7 +118,7 @@ qrcode==8.2
 redis==6.2.0
 referencing==0.36.2
 requests==2.32.4
--e git+https://github.com/Formula-hub2/formula-hub.git@07059c1b770b908598d1f2a79865f9851b444129#egg=rosemary
+-e git+https://github.com/Formula-hub2/formula-hub.git@27f2144450b65aaeb25ca62afe59bee1ea095b00#egg=rosemary
 rpds-py==0.26.0
 rq==2.4.1
 selenium==4.34.2
@@ -126,6 +131,8 @@ sortedcontainers==2.4.0
 soupsieve==2.7
 SQLAlchemy==2.0.42
 SQLAlchemy-Utils==0.41.2
+StrEnum==0.4.15
+token-bucket==0.3.0
 trio==0.30.0
 trio-websocket==0.12.2
 typing_extensions==4.14.1
@@ -139,6 +146,7 @@ webencodings==0.5.1
 websocket-client==1.8.0
 Werkzeug==3.1.3
 wheel==0.45.1
+wrapt==2.0.1
 wsproto==1.2.0
 WTForms==3.2.1
 zope.event==5.1.1
