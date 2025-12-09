@@ -472,7 +472,7 @@ def test_session_security_features():
                 security_checks.append("✓ Información de dispositivo/IP mostrada")
             else:
                 security_checks.append("ℹ️ No se encontró información de dispositivo")
-        except Exception:  # CAMBIADO: except -> except Exception
+        except Exception:
             security_checks.append("ℹ️ No se pudo verificar información de dispositivo")
 
         try:
@@ -486,7 +486,7 @@ def test_session_security_features():
                 security_checks.append("✓ Información de fecha/hora mostrada")
             else:
                 security_checks.append("ℹ️ No se encontró información de fecha/hora")
-        except Exception:  # CAMBIADO: except -> except Exception
+        except Exception:
             security_checks.append("ℹ️ No se pudo verificar información de fecha/hora")
 
         try:
@@ -499,7 +499,7 @@ def test_session_security_features():
                 security_checks.append("✓ Sesión actual identificada")
             else:
                 security_checks.append("ℹ️ No se identificó la sesión actual")
-        except Exception:  # CAMBIADO: except -> except Exception
+        except Exception:
             security_checks.append("ℹ️ No se pudo identificar sesión actual")
 
         print("\n🔒 Resultados de verificación de seguridad:")
@@ -530,7 +530,7 @@ def test_session_security_features():
         close_driver(driver)
 
 
-# 7 - test_active_sessions_complete_workflow (líneas ~568, 575, 587, 608, 610)
+# 7
 def test_active_sessions_complete_workflow():
     """Test completo del flujo de trabajo de sesiones activas"""
     driver = initialize_driver()
@@ -566,13 +566,13 @@ def test_active_sessions_complete_workflow():
         driver.get(f"{host}/active_sessions")
         time.sleep(3)
 
-        initial_url = driver.current_url  # SOLO esta línea, ELIMINAR la línea con initial_page
+        initial_url = driver.current_url
 
         print("3. Capturando información de sesiones...")
         try:
             driver.save_screenshot("active_sessions_initial.png")
             print("   📸 Captura inicial guardada: active_sessions_initial.png")
-        except Exception:  # CAMBIADO: except -> except Exception
+        except Exception:
             pass
 
         print("4. Interactuando con elementos de la página...")
@@ -594,9 +594,9 @@ def test_active_sessions_complete_workflow():
                     if i == 0:
                         driver.back()
                     time.sleep(1)
-                except Exception:  # CAMBIADO: except -> except Exception
+                except Exception:
                     continue
-        except Exception:  # CAMBIADO: except -> except Exception
+        except Exception:
             print("   ℹ️ No se encontraron elementos interactivos seguros")
 
         print("5. Verificando integridad de la página...")
