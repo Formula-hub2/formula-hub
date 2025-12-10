@@ -1,12 +1,9 @@
 import os
-from curses import flash
 
 from dotenv import load_dotenv
-from flask import Flask, redirect, url_for
-from flask_login import current_user, logout_user
+from flask import Flask
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
-from requests import session
 
 from core.configuration.configuration import get_app_version
 from core.managers.config_manager import ConfigManager
@@ -14,8 +11,10 @@ from core.managers.error_handler_manager import ErrorHandlerManager
 from core.managers.logging_manager import LoggingManager
 from core.managers.module_manager import ModuleManager
 
+# Load environment variables
 load_dotenv()
 
+# Create the instances
 db = SQLAlchemy()
 migrate = Migrate()
 
@@ -23,15 +22,19 @@ migrate = Migrate()
 def create_app(config_name="development"):
     app = Flask(__name__)
 
+    # Load configuration according to environment
     config_manager = ConfigManager(app)
     config_manager.load_config(config_name=config_name)
 
+    # Initialize SQLAlchemy and Migrate with the app
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # Register modules
     module_manager = ModuleManager(app)
     module_manager.register_modules()
 
+    # Register login manager
     from flask_login import LoginManager
 
     login_manager = LoginManager()
@@ -44,47 +47,60 @@ def create_app(config_name="development"):
 
         return User.query.get(int(user_id))
 
+    # Set up logging
     logging_manager = LoggingManager(app)
     logging_manager.setup_logging()
 
+    # Initialize error handler manager
     error_handler_manager = ErrorHandlerManager(app)
     error_handler_manager.register_error_handlers()
 
     @app.before_request
     def check_session_globally():
-        from flask import request as flask_request
+        """
+        Verifica en cada petición si la sesión del usuario sigue siendo válida.
+        Si la sesión fue cerrada desde otro dispositivo, fuerza logout y redirige al login.
+        """
+        from flask import flash as flask_flash_func
+        from flask import redirect
+        from flask import request as flask_request_obj
+        from flask import session as flask_session_obj
+        from flask import url_for
+        from flask_login import current_user, logout_user
 
-        if flask_request.endpoint == "static":
-            return None
-        excluded_paths = [
-            "/auth/login",
-            "/auth/signup",
-            "/auth/verify_2fa",
-            "/auth/logout",
-            "/auth/check_session",
+        NO_CHECK_PATHS = [
+            "/auth/",  # Todas las rutas de autenticación (incluye signup)
+            "/static/",  # Archivos estáticos
+            "/public/",  # Rutas públicas
+            "/favicon.ico",
         ]
-        current_path = flask_request.path
-        if any(current_path.startswith(path) for path in excluded_paths):
-            return None
+
+        current_path = flask_request_obj.path
+        for no_check_path in NO_CHECK_PATHS:
+            if current_path.startswith(no_check_path):
+                return None
+
         if current_user.is_authenticated:
             try:
                 from app.modules.auth.services import AuthenticationService
 
                 auth_service = AuthenticationService()
+
                 if not auth_service.is_current_session_valid():
                     logout_user()
-                    session.clear()
-                    flash("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
+                    flask_session_obj.clear()
+                    flask_flash_func("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
                     return redirect(url_for("auth.login"))
-            except Exception as e:
-                import traceback
 
-                app.logger.error(f"Error verificando sesión: {str(e)}\n{traceback.format_exc()}")
+            except Exception as e:
+                app.logger.error(f"Error en check_session_globally: {e}")
                 logout_user()
-                flash("Error validando tu sesión. Por favor, inicia sesión nuevamente.", "warning")
+                flask_session_obj.clear()
                 return redirect(url_for("auth.login"))
+
         return None
 
+    # Injecting environment variables into jinja context
     @app.context_processor
     def inject_vars_into_jinja():
         return {

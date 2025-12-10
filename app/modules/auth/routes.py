@@ -1,7 +1,12 @@
 import os
 from functools import wraps
 
-from flask import flash, make_response, redirect, render_template, request, session, url_for
+from flask import flash
+from flask import flash as flask_flash_func
+from flask import make_response, redirect, render_template, request
+from flask import session
+from flask import session as flask_session_obj
+from flask import url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import current_user, login_user, logout_user
@@ -29,13 +34,13 @@ def require_valid_session(f):
             try:
                 if not authentication_service.is_current_session_valid():
                     logout_user()
-                    session.clear()
-                    flash("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
+                    flask_session_obj.clear()
+                    flask_flash_func("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
                     return redirect(url_for("auth.login"))
             except Exception:
                 logout_user()
-                session.clear()
-                flash("Error validando tu sesión. Por favor, inicia sesión nuevamente.", "warning")
+                flask_session_obj.clear()
+                flask_flash_func("Error validando tu sesión. Por favor, inicia sesión nuevamente.", "warning")
                 return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
 
