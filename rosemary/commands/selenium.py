@@ -53,7 +53,8 @@ def selenium(module, driver):
         def run_selenium_tests(module_name, env="local"):
             """Run Selenium tests in the specified environment."""
             test_paths = collect_test_paths(module_name)
-            base_cmd = "pytest" if env == "docker" else "python"
+            # base_cmd = "pytest" if env == "docker" else "python"
+            base_cmd = "pytest"
             cmd = [base_cmd] + test_paths
 
             env_label = "Docker (Selenium Grid)" if env == "docker" else "local environment"

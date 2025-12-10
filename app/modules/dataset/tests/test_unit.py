@@ -6,10 +6,7 @@ from sqlalchemy import text
 from app import db
 from app.modules.auth.models import User
 from app.modules.dataset.models import DataSet, DSDownloadRecord, DSMetaData, PublicationType, RawDataSet, UVLDataSet
-
-# ==============================================================================
-# FIXTURES COMUNES
-# ==============================================================================
+from app.modules.dataset.services import DataSetService, RawDataSetService, UVLDataSetService
 
 
 @pytest.fixture(scope="module")
@@ -28,7 +25,6 @@ def test_user(test_client):
     db.session.expire_all()
     user_to_delete = db.session.get(User, user.id)
     if user_to_delete:
-        # Esto borrará en cascada todos los datasets creados por este usuario
         db.session.delete(user_to_delete)
         db.session.commit()
 
@@ -88,11 +84,6 @@ def clean_datasets(test_user):
     db.session.commit()
 
 
-# ==============================================================================
-# BLOQUE 1: TESTS DE LÓGICA DE NEGOCIO (CONTADOR)
-# ==============================================================================
-
-
 def test_download_counter_backend_logic(test_client, dataset_fixture):
     """
     Verifica que el contador sube al llamar a la ruta, mockeando el sistema de archivos.
@@ -138,13 +129,7 @@ def test_download_counter_idempotency_check(test_client, dataset_fixture):
     db.session.expire_all()
     dataset_refreshed = db.session.get(DataSet, dataset_id)
 
-    # Nota: Ajusta esto según si tu lógica permite o no contar descargas repetidas
     assert dataset_refreshed.download_count >= 1
-
-
-# ==============================================================================
-# BLOQUE 2: TESTS DE ARQUITECTURA (POLIMORFISMO)
-# ==============================================================================
 
 
 def test_polymorphic_retrieval(test_user, clean_datasets):
@@ -233,3 +218,369 @@ def test_cascade_deletion_polymorphic(test_user, clean_datasets):
 
     assert res_parent == 0
     assert res_child == 0
+
+
+def test_uvl_create_from_form_happy_path():
+    """
+    Verifica que el servicio orquesta todo: metadatos, autores, dataset, fm y ficheros.
+    """
+    # 1. Instanciar servicio y BLINDAR todas las dependencias con Mocks
+    service = UVLDataSetService()
+    service.repository = MagicMock()
+    service.dsmetadata_repository = MagicMock()
+    service.author_repository = MagicMock()
+    service.feature_model_repository = MagicMock()
+    service.fmmetadata_repository = MagicMock()
+    service.hubfilerepository = MagicMock()
+
+    # 2. Mockear el formulario
+    mock_form = MagicMock()
+    mock_form.get_dsmetadata.return_value = {"title": "Test"}
+    mock_form.get_authors.return_value = []
+
+    # Simular un feature model dentro del form
+    fm_form = MagicMock()
+    fm_form.uvl_filename.data = "test.uvl"
+    fm_form.get_fmmetadata.return_value = {}
+    fm_form.get_authors.return_value = []
+    # Aseguramos que sea iterable
+    mock_form.feature_models = [fm_form]
+
+    # 3. Mockear usuario
+    mock_user = MagicMock()
+    mock_user.id = 1
+    mock_user.temp_folder.return_value = "/tmp"
+
+    # 4. Ejecutar con patch del cálculo de hash
+    with patch("app.modules.dataset.services.calculate_checksum_and_size", return_value=("hash", 100)):
+        service.create_from_form(mock_form, mock_user)
+
+    # 5. Verificaciones
+    # Verificar que se llamó al commit
+    service.repository.session.commit.assert_called_once()
+
+    # Verificar creación de componentes
+    service.dsmetadata_repository.create.assert_called()
+    service.repository.create.assert_called()
+    service.hubfilerepository.create.assert_called()
+
+
+def test_uvl_create_rollback_on_error():
+    """
+    Si falla el cálculo del hash, debe hacer rollback.
+    """
+    service = UVLDataSetService()
+
+    # Mockear TODOS los repositorios para evitar usar objetos reales
+    service.repository = MagicMock()
+    service.dsmetadata_repository = MagicMock()
+    service.author_repository = MagicMock()
+    service.feature_model_repository = MagicMock()
+    service.fmmetadata_repository = MagicMock()
+    service.hubfilerepository = MagicMock()
+
+    # Configurar mocks para que devuelvan objetos válidos hasta el punto de fallo
+    service.dsmetadata_repository.create.return_value = MagicMock(id=1)
+
+    mock_form = MagicMock()
+    mock_form.feature_models = [MagicMock()]
+
+    # Simular fallo en disco (hash calculation error)
+    with patch("app.modules.dataset.services.calculate_checksum_and_size", side_effect=Exception("Disk Fail")):
+        try:
+            service.create_from_form(mock_form, MagicMock())
+        except Exception:
+            pass  # Esperamos el error, continuamos para verificar el rollback
+
+    # Verificar limpieza
+    service.repository.session.rollback.assert_called_once()
+    service.repository.session.commit.assert_not_called()
+
+
+def test_create_combined_dataset_file_copying():
+    """
+    Simula la creación de un dataset combinado asegurando que se copian los archivos físicos.
+    """
+    # Setup del servicio base
+    service = DataSetService()
+    service.repository = MagicMock()
+    service.dsmetadata_repository = MagicMock()
+
+    # Mockear el dataset origen (source)
+    source_ds = MagicMock(spec=UVLDataSet)
+    source_ds.id = 99
+    source_ds.user_id = 5
+
+    # Mockear un feature model dentro del origen
+    fm_mock = MagicMock()
+    fm_mock.fm_meta_data = MagicMock()
+    file_mock = MagicMock()
+    file_mock.name = "original.uvl"
+    fm_mock.files = [file_mock]
+    source_ds.feature_models = [fm_mock]
+
+    # Mockear la recuperación del dataset por ID
+    service.get_or_404 = MagicMock(return_value=source_ds)
+
+    with (
+        patch("app.modules.dataset.services.os.makedirs") as mock_mkdirs,
+        patch("app.modules.dataset.services.os.path.exists", return_value=True),
+        patch("app.modules.dataset.services.shutil.copy2") as mock_copy,
+    ):
+
+        # Ejecutar
+        service.create_combined_dataset(
+            current_user=MagicMock(id=1),
+            title="Combined",
+            description="Desc",
+            publication_type="annotationcollection",
+            tags="tag",
+            source_dataset_ids=[99],
+        )
+
+        # Aserciones Clave
+        # 1. Se intentó crear carpeta de destino
+        mock_mkdirs.assert_called()
+
+        # 2. Se intentó copiar el archivo (Verificamos la lógica de copy2)
+        assert mock_copy.call_count == 1
+        args, _ = mock_copy.call_args
+        assert "original.uvl" in args[0]
+        assert "dataset_99" in args[0]
+
+
+def test_raw_dataset_creation_metadata():
+    """
+    Verifica que RawDataSetService asigna correctamente los metadatos y autores.
+    """
+    service = RawDataSetService()
+    service.repository = MagicMock()
+    service.dsmetadata_repository = MagicMock()
+    service.author_repository = MagicMock()
+
+    mock_form = MagicMock()
+    mock_form.get_dsmetadata.return_value = {"title": "Raw Data"}
+
+    mock_user = MagicMock()
+    mock_user.profile.surname = "Doe"
+
+    # Ejecutar
+    service.create_from_form(mock_form, mock_user)
+
+    # Verificar que se creó el autor por defecto (el usuario logueado)
+    service.author_repository.create.assert_called()
+    call_args = service.author_repository.create.call_args[1]
+    assert "Doe" in call_args["name"]
+
+    # Verificar commit
+    service.repository.create.assert_called_with(
+        commit=True, user_id=mock_user.id, ds_meta_data_id=service.dsmetadata_repository.create.return_value.id
+    )
+
+
+def test_create_combined_dataset_logic():
+    from app.modules.dataset.models import UVLDataSet
+
+    # Setup
+    service = DataSetService()
+    service.repository = MagicMock()
+    service.dsmetadata_repository = MagicMock()
+
+    # Mock source dataset
+    source_ds = MagicMock(spec=UVLDataSet)
+    source_ds.id = 99
+    source_ds.user_id = 5
+    # Mock Feature Model
+    fm_mock = MagicMock()
+    fm_mock.fm_meta_data = MagicMock()
+    fm_mock.files = [MagicMock(name="file.uvl", checksum="123", size=10)]
+    source_ds.feature_models = [fm_mock]
+
+    service.get_or_404 = MagicMock(return_value=source_ds)
+
+    # Mock OS operations
+    with (
+        patch("app.modules.dataset.services.os.makedirs"),
+        patch("app.modules.dataset.services.os.path.exists", return_value=True),
+        patch("app.modules.dataset.services.shutil.copy2") as mock_copy,
+    ):
+
+        service.create_combined_dataset(
+            current_user=MagicMock(id=1),
+            title="Combined",
+            description="Desc",
+            publication_type="annotationcollection",
+            tags="tag",
+            source_dataset_ids=[99],
+        )
+
+        # Verify file copy was attempted
+        assert mock_copy.call_count == 1
+        # Verify commit
+        service.repository.session.commit.assert_called()
+
+
+def test_route_list_datasets(test_client):
+    """
+    Verifica que la página de listado carga correctamente.
+    FIX: Mockeamos current_user explícitamente porque LOGIN_DISABLED inyecta un usuario anónimo sin ID.
+    """
+    test_client.application.config["LOGIN_DISABLED"] = True
+
+    with (
+        patch("app.modules.dataset.routes.dataset_service") as mock_service,
+        patch("app.modules.dataset.routes.current_user") as mock_user,
+    ):
+
+        mock_user.id = 1
+
+        mock_service.get_synchronized.return_value = []
+        mock_service.get_unsynchronized.return_value = []
+
+        response = test_client.get("/dataset/list")
+
+    test_client.application.config["LOGIN_DISABLED"] = False
+
+    assert response.status_code == 200
+    mock_service.get_synchronized.assert_called()
+
+
+def test_route_file_delete_async(test_client):
+    """
+    Verifica el borrado de archivos.
+    FIX: Usamos new_callable=MagicMock para evitar que pytest cree un AsyncMock por error.
+    """
+    # Caso 1: Archivo existe
+    with (
+        patch("app.modules.dataset.routes.os.path.exists", return_value=True),
+        patch("app.modules.dataset.routes.os.remove") as mock_remove,
+        patch("app.modules.dataset.routes.current_user", new_callable=MagicMock) as mock_user,
+    ):
+
+        mock_user.temp_folder.return_value = "/tmp"
+
+        response = test_client.post("/dataset/file/delete", json={"file": "borrame.uvl"})
+
+        assert response.status_code == 200
+        assert response.json == {"message": "File deleted successfully"}
+        mock_remove.assert_called()
+
+    # Caso 2: Archivo NO existe
+    with (
+        patch("app.modules.dataset.routes.os.path.exists", return_value=False),
+        patch("app.modules.dataset.routes.current_user", new_callable=MagicMock) as mock_user,
+    ):
+
+        mock_user.temp_folder.return_value = "/tmp"
+        response = test_client.post("/dataset/file/delete", json={"file": "fantasma.uvl"})
+
+        assert response.json == {"error": "Error: File not found"}
+
+
+def test_route_view_dataset_forbidden(test_client):
+    """
+    Verifica que un usuario no puede ver un dataset no sincronizado de otro usuario.
+    Cubre: GET /dataset/view/<id> (Lógica de permisos 403)
+    """
+    test_client.application.config["LOGIN_DISABLED"] = True  # Bypass @login_required
+
+    with (
+        patch("app.modules.dataset.routes.dataset_service") as mock_service,
+        patch("app.modules.dataset.routes.current_user") as mock_user,
+    ):
+
+        # Simulamos dataset perteneciente al usuario 99
+        mock_ds = MagicMock()
+        mock_ds.user_id = 99
+        mock_service.get_or_404.return_value = mock_ds
+
+        # Simulamos que somos el usuario 1
+        mock_user.is_authenticated = True
+        mock_user.id = 1
+
+        response = test_client.get("/dataset/view/100")
+
+    test_client.application.config["LOGIN_DISABLED"] = False
+
+    assert response.status_code == 403
+
+
+def test_route_doi_redirection(test_client):
+    """
+    Verifica la redirección si el DOI ha cambiado.
+    FIX: Añadimos '/' al final de la URL para coincidir con la definición de la ruta y evitar el 308.
+    """
+    with patch("app.modules.dataset.routes.doi_mapping_service") as mock_doi_service:
+        mock_doi_service.get_new_doi.return_value = "new/doi/123"
+
+        response = test_client.get("/doi/old/doi/123/")
+
+    assert response.status_code == 302
+    assert "new/doi/123" in response.location
+
+
+def test_service_move_feature_models():
+    """
+    Verifica la lógica de movimiento físico de archivos en UVLDataSetService.
+    Esta función no estaba testeada en el servicio.
+    """
+    service = UVLDataSetService()
+
+    # Mock dataset y feature models
+    mock_ds = MagicMock()
+    mock_ds.id = 10
+    mock_ds.user_id = 1
+
+    mock_fm = MagicMock()
+    mock_fm.fm_meta_data.uvl_filename = "model.uvl"
+    mock_ds.feature_models = [mock_fm]
+
+    # Mock mocks de Auth y OS
+    with (
+        patch("app.modules.dataset.services.AuthenticationService") as MockAuth,
+        patch("app.modules.dataset.services.shutil.move") as mock_move,
+        patch("app.modules.dataset.services.os.makedirs"),
+    ):
+
+        MockAuth.return_value.get_authenticated_user.return_value.temp_folder.return_value = "/tmp"
+        MockAuth.return_value.get_authenticated_user.return_value.id = 1
+
+        service.move_feature_models(mock_ds)
+
+        mock_move.assert_called_once()
+        args, _ = mock_move.call_args
+        assert "model.uvl" in args[0]  # Source
+        assert "dataset_10" in args[1]  # Destino
+
+
+def test_form_publication_type_conversion():
+    """
+    Verifica el método auxiliar convert_publication_type en DataSetForm.
+    A veces los tests de rutas no cubren todas las ramas de estos helpers.
+    """
+    from app.modules.dataset.forms import DataSetForm, PublicationType
+
+    form = DataSetForm()
+
+    # Caso 1: Tipo válido
+    res = form.convert_publication_type(PublicationType.BOOK.value)
+    assert res == "BOOK"
+
+    # Caso 2: Tipo inválido o no coincidente
+    res = form.convert_publication_type("inventado")
+    assert res == "NONE"
+
+
+def test_uvlhub_doi_generation():
+    """
+    Verifica la generación de la URL del DOI.
+    """
+    from app.modules.dataset.services import DataSetService
+
+    service = DataSetService()
+    mock_ds = MagicMock()
+    mock_ds.ds_meta_data.dataset_doi = "10.1234/foo"
+
+    with patch("app.modules.dataset.services.os.getenv", return_value="uvlhub.io"):
+        url = service.get_uvlhub_doi(mock_ds)
+        assert url == "http://uvlhub.io/doi/10.1234/foo"

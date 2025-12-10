@@ -25,7 +25,7 @@ def coverage(module_name, html):
 
     coverage_cmd = [
         "pytest",
-        "--ignore-glob=*selenium*",
+        # "--ignore-glob=*selenium*",
         "--cov=" + test_path,
         test_path,
     ]

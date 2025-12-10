@@ -154,22 +154,9 @@ class TestDatasetLifecycle:
         assert (
             final_count == initial_count + 1
         ), f"ERROR: La base de datos no guardó el incremento. Inicio: {initial_count}, Final: {final_count}"
-
-        # -----------------------------------------------------------------------
-        # 5. IDEMPOTENCIA (Opcional, pero recomendado)
-        # -----------------------------------------------------------------------
-        # Si descargo de nuevo con la misma sesión (misma cookie), no debería subir
         download_btn = driver.find_element(By.ID, "download_btn")
         download_btn.click()
-
-        # El frontend subirá visualmente porque tu script JS es "tonto" (suma siempre),
-        # pero al recargar, la DB debe volver al valor correcto (final_count).
         driver.refresh()
-
-        # IMPORTANTE: Esto pasará SOLO si tu lógica de backend comprueba la cookie correctamente.
-        # Si tu backend suma siempre, este assert fallará (y deberías arreglar el backend).
-        # assert count_check_idempotency == final_count,
-        # "ERROR: El contador subió en la segunda descarga (no es idempotente)."
 
         # Limpieza de archivo dummy si se creó
         if "dummy_test.uvl" in file_path and os.path.exists(file_path):
