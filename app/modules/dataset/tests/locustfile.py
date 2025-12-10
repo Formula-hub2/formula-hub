@@ -4,8 +4,6 @@ from html.parser import HTMLParser
 
 from locust import HttpUser, TaskSet, between, task
 
-# --- CONFIGURACIÓN DEL HOST ---
-# Intentamos importar tu configuración, si falla, usa localhost
 try:
     from core.environment.host import get_host_for_locust_testing
 except ImportError:
@@ -14,19 +12,15 @@ except ImportError:
         return "http://localhost:5000"
 
 
-# --- PARSER NATIVO PARA EL CSRF TOKEN (Sin instalar nada extra) ---
 class CSRFTokenParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.csrf_token = None
 
     def handle_starttag(self, tag, attrs):
-        # Buscamos un <input>
         if tag == "input":
             attrs_dict = dict(attrs)
-            # Que tenga name="csrf_token"
             if attrs_dict.get("name") == "csrf_token":
-                # Capturamos su valor
                 self.csrf_token = attrs_dict.get("value")
 
 
@@ -36,7 +30,6 @@ def get_csrf_token(html_content):
     return parser.csrf_token
 
 
-# --- COMPORTAMIENTO DEL USUARIO ---
 class DatasetBehavior(TaskSet):
     dataset_ids = []
 
@@ -48,23 +41,17 @@ class DatasetBehavior(TaskSet):
             self.interrupt(reschedule=False)
 
     def login(self):
-        # 1. GET para obtener el token del HTML
         with self.client.get("/login", name="/login (GET)", catch_response=True) as response:
             if response.status_code != 200:
                 print(f"⚠️ Error cargando login: {response.status_code}")
                 return False
 
-            # Usamos el parser nativo
             csrf_token = get_csrf_token(response.text)
 
             if not csrf_token:
                 print("❌ ERROR: No encuentro el CSRF token. Revisa el HTML de /login")
-                # Debug: descomenta esto si sigue fallando para ver qué HTML recibes
-                # print(response.text)
                 return False
 
-        # 2. POST para iniciar sesión
-        # ASEGÚRATE DE QUE ESTE USUARIO EXISTE EN TU BD
         res = self.client.post(
             "/login",
             data={
@@ -75,22 +62,17 @@ class DatasetBehavior(TaskSet):
             name="/login (POST)",
         )
 
-        # Consideramos éxito si no hay error 400/500.
-        # (Idealmente comprobaríamos si redirige, pero esto basta para carga)
         return res.status_code < 400
 
     def fetch_dataset_ids(self):
         with self.client.get("/dataset/list", name="/dataset/list", catch_response=True) as response:
-            # Usamos Regex para los enlaces porque es más simple que parsear toda la tabla
-            # Buscamos href="/dataset/download/NUMERO" admitiendo comillas simples o dobles
-            # Pattern: href=["'] (comilla simple o doble) /dataset/download/ (ruta) (\d+) (número) ["'] (cierre)
             found = re.findall(r'href=["\']/dataset/download/(\d+)["\']', response.text)
 
             if not found:
                 print("⚠️ WARNING: Login OK, pero no veo enlaces de descarga en /dataset/list.")
                 print("   -> ¿Has subido algún dataset con este usuario o es público?")
             else:
-                self.dataset_ids = list(set(found))  # Quitar duplicados
+                self.dataset_ids = list(set(found))
                 print(f"✅ INFO: Usuario listo. Encontrados {len(self.dataset_ids)} datasets.")
 
     @task(1)
