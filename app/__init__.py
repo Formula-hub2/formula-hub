@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from flask import Flask
+from flask_login import current_user, logout_user
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 
@@ -54,6 +55,50 @@ def create_app(config_name="development"):
     # Initialize error handler manager
     error_handler_manager = ErrorHandlerManager(app)
     error_handler_manager.register_error_handlers()
+
+    @app.before_request
+    def check_session_globally():
+        """
+        Verifica en cada petición si la sesión del usuario sigue siendo válida.
+        Si la sesión fue cerrada desde otro dispositivo, fuerza logout y redirige al login.
+        """
+        from flask import flash as flask_flash
+        from flask import redirect
+        from flask import request as flask_request
+        from flask import session as flask_session_object
+        from flask import url_for
+
+        NO_CHECK_PATHS = [
+            "/auth/",
+            "/static/",
+            "/public/",
+            "/favicon.ico",
+            "/logout",
+        ]
+
+        current_path = flask_request.path
+        for no_check_path in NO_CHECK_PATHS:
+            if current_path.startswith(no_check_path):
+                return None
+        if current_user.is_authenticated:
+            try:
+                from app.modules.auth.services import AuthenticationService
+
+                auth_service = AuthenticationService()
+
+                if not auth_service.is_current_session_valid():
+                    logout_user()
+                    flask_session_object.clear()
+                    flask_flash("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
+                    return redirect(url_for("auth.login"))
+
+            except Exception as e:
+                app.logger.error(f"Error en check_session_globally: {e}")
+                logout_user()
+                flask_session_object.clear()
+                return redirect(url_for("auth.login"))
+
+        return None
 
     # Injecting environment variables into jinja context
     @app.context_processor
