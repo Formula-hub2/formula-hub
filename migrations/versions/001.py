@@ -338,6 +338,7 @@ def upgrade():
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("last_activity", sa.DateTime(), nullable=False),
         sa.Column("device_id", sa.String(length=256), nullable=True),
+        sa.Column("flask_session_token", sa.String(length=512), nullable=True),
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["user.id"],

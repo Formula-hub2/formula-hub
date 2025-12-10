@@ -2,6 +2,7 @@ import logging
 
 from flask import render_template
 
+from app.modules.auth.routes import require_valid_session
 from app.modules.dataset.services import DataSetService
 from app.modules.featuremodel.services import FeatureModelService
 from app.modules.public import public_bp
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 @public_bp.route("/")
+@require_valid_session
 def index():
     logger.info("Access index")
     dataset_service = DataSetService()

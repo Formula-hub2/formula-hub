@@ -64,5 +64,7 @@ class UserSession(db.Model):
     last_activity = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     device_id = db.Column(db.String(256), nullable=True)
 
+    flask_session_token = db.Column(db.String(512), nullable=True)
+
     def update_activity(self):
         self.last_activity = datetime.now(timezone.utc)
