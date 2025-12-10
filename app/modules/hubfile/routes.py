@@ -16,7 +16,9 @@ def download_file(file_id):
     file = HubfileService().get_or_404(file_id)
     filename = file.name
 
-    directory_path = f"uploads/user_{file.feature_model.data_set.user_id}/dataset_{file.feature_model.uvl_dataset_id}/"
+    directory_path = (
+        f"uploads/user_{file.feature_model.uvl_dataset.user_id}/dataset_{file.feature_model.uvl_dataset_id}/"
+    )
     parent_directory_path = os.path.dirname(current_app.root_path)
     file_path = os.path.join(parent_directory_path, directory_path)
 
@@ -51,7 +53,9 @@ def view_file(file_id):
     file = HubfileService().get_or_404(file_id)
     filename = file.name
 
-    directory_path = f"uploads/user_{file.feature_model.data_set.user_id}/dataset_{file.feature_model.uvl_dataset_id}/"
+    directory_path = (
+        f"uploads/user_{file.feature_model.uvl_dataset.user_id}/dataset_{file.feature_model.uvl_dataset_id}/"
+    )
     parent_directory_path = os.path.dirname(current_app.root_path)
     file_path = os.path.join(parent_directory_path, directory_path, filename)
 
