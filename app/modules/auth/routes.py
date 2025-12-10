@@ -58,11 +58,7 @@ def show_signup_form():
         except Exception as exc:
             return render_template("auth/signup_form.html", form=form, error=f"Error creating user: {exc}")
 
-        # Log user
         login_user(user, remember=True)
-
-        user_session = authentication_service.create_user_session(user)
-        session["session_id"] = user_session.session_id
         return redirect(url_for("public.index"))
 
     return render_template("auth/signup_form.html", form=form)
@@ -180,6 +176,7 @@ def terminate_session(session_id):
         return redirect(url_for("auth.login"))
 
     current_session_id = session.get("session_id")
+
     if session_id == current_session_id:
         flash("No puedes cerrar la sesión actual desde aquí.")
         return redirect(url_for("auth.sesiones_activas"))
@@ -204,5 +201,4 @@ def check_session():
 @auth_bp.errorhandler(429)
 def ratelimit_handler(e):
     form = LoginForm()
-
     return render_template("auth/login_form.html", form=form, countdown=60), 429

@@ -123,37 +123,20 @@ class AuthenticationService(BaseService):
         flask_session_token = hashlib.sha256(
             f"{session_id}{datetime.now(timezone.utc).timestamp()}".encode()
         ).hexdigest()
-
-        user_agent = "Unknown"
-        ip_address = "0.0.0.0"
-        device_id = None
-
-        try:
-            if request and hasattr(request, "headers"):
-                user_agent = request.headers.get("User-Agent", "Unknown")
-                ip_address = request.remote_addr
-                device_id = request.cookies.get("device_id")
-        except RuntimeError:
-            pass
-
         user_session = UserSession(
             user_id=user.id,
             session_id=session_id,
-            user_agent=user_agent,
-            ip_address=ip_address,
-            device_id=device_id,
+            user_agent=request.headers.get("User-Agent"),
+            ip_address=request.remote_addr,
+            device_id=request.cookies.get("device_id"),
             flask_session_token=flask_session_token,
         )
         self.repository.session.add(user_session)
         self.repository.session.commit()
 
-        try:
-            from flask import session as flask_session
+        from flask import session as flask_session
 
-            flask_session["session_token"] = flask_session_token
-        except RuntimeError:
-            pass
-
+        flask_session["session_token"] = flask_session_token
         return user_session
 
     def get_active_sessions(self, user: User):
