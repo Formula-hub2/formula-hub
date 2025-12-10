@@ -414,7 +414,6 @@ def test_multiple_sessions_from_different_devices():
 
 
 # 6
-# 6 - test_session_security_features (líneas ~474, 488, 501)
 def test_session_security_features():
     """Test para verificar características de seguridad de sesiones"""
     driver = initialize_driver()
@@ -521,7 +520,7 @@ def test_session_security_features():
         except NoSuchElementException:
             print("ℹ️ No se encontró enlace de logout específico")
 
-        return True
+        assert True
 
     finally:
         close_driver(driver)
@@ -613,7 +612,7 @@ def test_active_sessions_complete_workflow():
         time.sleep(2)
 
         print("\n✅ Test completo de flujo finalizado exitosamente")
-        return True
+        assert True
 
     finally:
         print("\n🧹 Limpiando después del test de flujo...")
