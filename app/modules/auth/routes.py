@@ -157,7 +157,16 @@ def show_signup_form():
             # logout if necessary.
             pass
 
-        return redirect(url_for("public.index"))
+        # Ensure device_id cookie is set for this new signup session so the
+        # session will be grouped with subsequent logins from the same browser.
+        device_id = request.cookies.get("device_id")
+        if not device_id:
+            import uuid
+
+            device_id = str(uuid.uuid4())
+        resp = make_response(redirect(url_for("public.index")))
+        resp.set_cookie("device_id", device_id, max_age=60 * 60 * 24 * 365 * 2, httponly=True, secure=True)
+        return resp
 
     return render_template("auth/signup_form.html", form=form)
 
@@ -202,7 +211,13 @@ def login():
             user_session = authentication_service.create_user_session(user)
             session["session_id"] = user_session.session_id
             resp = make_response(redirect(url_for("public.index")))
-            resp.set_cookie("device_id", device_id, max_age=60 * 60 * 24 * 365 * 2, httponly=True, secure=True)
+            resp.set_cookie(
+                "device_id",
+                device_id,
+                max_age=60 * 60 * 24 * 365 * 2,
+                httponly=True,
+                secure=current_app.config.get("SESSION_COOKIE_SECURE", False),
+            )
             return resp
         authentication_service.repository.register_failed_attempt(user)
         if user and authentication_service.repository.is_account_blocked(user):
@@ -238,7 +253,22 @@ def verify_2fa():
             user_session = authentication_service.create_user_session(user)
             session["session_id"] = user_session.session_id
             session.pop("two_factor_user_id", None)
-            return redirect(url_for("public.index"))
+
+            # Ensure device_id cookie is set as in the normal login flow
+            device_id = request.cookies.get("device_id")
+            if not device_id:
+                import uuid
+
+                device_id = str(uuid.uuid4())
+            resp = make_response(redirect(url_for("public.index")))
+            resp.set_cookie(
+                "device_id",
+                device_id,
+                max_age=60 * 60 * 24 * 365 * 2,
+                httponly=True,
+                secure=current_app.config.get("SESSION_COOKIE_SECURE", False),
+            )
+            return resp
         flash("Código 2FA inválido")
 
     return render_template("auth/verify_2fa.html", csrf_token=generate_csrf)
