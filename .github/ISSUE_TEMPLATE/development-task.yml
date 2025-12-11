@@ -1,0 +1,66 @@
+name: "🔧 Development Task"
+description: "Technical task for the development team"
+title: "[TASK] "
+labels: ["Task"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🔧 Development Task
+        ---
+
+  - type: input
+    id: task-name
+    attributes:
+      label: "🎯 What needs to be done?"
+      placeholder: "Example: Refactor dataset creation service"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: task-type
+    attributes:
+      label: "🔨 Type of task"
+      options:
+        - "🧹 Code cleanup / Refactoring"
+        - "🧪 Add/improve tests"
+        - "⚡ Performance improvement"
+        - "🔒 Security fix"
+        - "📦 Update dependencies"
+        - "🔧 Infrastructure"
+        - "📚 Update documentation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-details
+    attributes:
+      label: "💻 What needs to change?"
+      placeholder: |
+        Example for refactoring:
+        File: app/modules/dataset/services.py
+    validations:
+      required: true
+
+  - type: textarea
+    id: criteria
+    attributes:
+      label: "✅ How do we know it's done?"
+      placeholder: |
+        Example:
+        - All tests pass
+        - No breaking changes
+        - Code follows our standards
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "🎯 Priority"
+      options:
+        - "🔥 Urgent - Blocking other work"
+        - "🔴 High - Should be done soon"
+        - "🟡 Medium - When possible"
+        - "🟢 Low - Nice to have"

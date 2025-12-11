@@ -42,3 +42,12 @@ profile = "black"
 [tool.flake8]
 max-line-length = 120
 extend-ignore = ["E203", "W503"]
+
+
+[tool.coverage.run]
+omit = [
+    "*locustfile.py",
+    "*/locustfile.py",
+    "*seeders.py",
+    "*/seeders.py",
+]

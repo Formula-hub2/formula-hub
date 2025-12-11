@@ -1,0 +1,64 @@
+name: "✨ Feature Request"
+description: "Suggest a new feature for FormulaHub"
+title: "[FEATURE] "
+labels: ["WorkItem"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # ✨ Feature Request
+
+        ---
+
+  - type: input
+    id: feature-name
+    attributes:
+      label: "🎯 What feature would you like?"
+      placeholder: "Example: Save shopping cart as template"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "🔍 What problem does this solve?"
+      placeholder: |
+        Example:
+        "I have to manually select the same 15 datasets every week for my analysis. This takes 10 minutes each time."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "💡 How should it work?"
+      placeholder: |
+        Example:
+        "Add 'Save as Template' button in shopping cart. User can name it. Later, click template to reload all datasets."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "📍 Where would it be used?"
+      options:
+        - "🛒 Shopping cart"
+        - "🔍 Explore page"
+        - "📊 Dataset creation"
+        - "📥 Download/Export"
+        - "👤 User account / Profile"
+        - "🎨 UI/Design"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "🎯 How important is this?"
+      options:
+        - "🔥 Critical - Can't work without it"
+        - "🔴 High - Very helpful"
+        - "🟡 Medium - Would be nice"
+        - "🟢 Low - Minor improvement"

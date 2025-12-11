@@ -118,7 +118,7 @@ qrcode==8.2
 redis==6.2.0
 referencing==0.36.2
 requests==2.32.4
--e git+https://github.com/Formula-hub2/formula-hub.git@27f2144450b65aaeb25ca62afe59bee1ea095b00#egg=rosemary
+-e git+https://github.com/Formula-hub2/formula-hub.git@767c5c0f9659ce1ed70a2e7baa853cf61820749a#egg=rosemary
 rpds-py==0.26.0
 rq==2.4.1
 selenium==4.34.2

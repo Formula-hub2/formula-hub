@@ -1,6 +1,7 @@
+import hashlib
 import os
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import request
 from flask_login import current_user, login_user
@@ -100,19 +101,59 @@ class AuthenticationService(BaseService):
     def verify_password(self, user: User, password: str) -> bool:
         return user.check_password(password)
 
-    # --- Métodos de sesiones activas ---
+    def is_current_session_valid(self) -> bool:
+        """Verifica si la sesión actual del usuario es válida."""
+        if not current_user.is_authenticated:
+            return False
+        from flask import session as flask_session
+
+        current_token = flask_session.get("session_token")
+        current_session_id = flask_session.get("session_id")
+        if not current_token or not current_session_id:
+            return False
+        session_obj = UserSession.query.filter_by(
+            session_id=current_session_id, flask_session_token=current_token, user_id=current_user.id
+        ).first()
+        return session_obj is not None
+
     def create_user_session(self, user: User):
         """Crea una nueva sesión activa para el usuario."""
         session_id = str(uuid.uuid4())
+
+        flask_session_token = hashlib.sha256(
+            f"{session_id}{datetime.now(timezone.utc).timestamp()}".encode()
+        ).hexdigest()
+
+        user_agent = "Unknown"
+        ip_address = "0.0.0.0"
+        device_id = None
+
+        try:
+            if request and hasattr(request, "headers"):
+                user_agent = request.headers.get("User-Agent", "Unknown")
+                ip_address = request.remote_addr
+                device_id = request.cookies.get("device_id")
+        except RuntimeError:
+            pass
+
         user_session = UserSession(
             user_id=user.id,
             session_id=session_id,
-            user_agent=request.headers.get("User-Agent"),
-            ip_address=request.remote_addr,
-            device_id=request.cookies.get("device_id"),
+            user_agent=user_agent,
+            ip_address=ip_address,
+            device_id=device_id,
+            flask_session_token=flask_session_token,
         )
         self.repository.session.add(user_session)
         self.repository.session.commit()
+
+        try:
+            from flask import session as flask_session_obj
+
+            flask_session_obj["session_token"] = flask_session_token
+        except RuntimeError:
+            pass
+
         return user_session
 
     def get_active_sessions(self, user: User):
@@ -127,6 +168,17 @@ class AuthenticationService(BaseService):
             self.repository.session.commit()
             return True
         return False
+
+    def verify_session_token(self, token: str, user_id: int) -> bool:
+        """Verifica si un token de sesión es válido para un usuario."""
+        if not token:
+            return False
+        session_obj = UserSession.query.filter_by(flask_session_token=token, user_id=user_id).first()
+        return session_obj is not None
+
+    def get_session_by_token(self, token: str):
+        """Obtiene una sesión por su token."""
+        return UserSession.query.filter_by(flask_session_token=token).first()
 
     def terminate_all_other_sessions(self, user: User, current_session_id: str):
         """Elimina todas las sesiones del usuario excepto la actual."""

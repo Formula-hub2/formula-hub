@@ -236,7 +236,22 @@
         fetch(`/file/view/${fileId}`)
             .then(response => response.json())
             .then(data => {
-                document.getElementById('fileContent').textContent = data.content;
+                const fileContent = document.getElementById('fileContent');
+
+                // CAMBIO IMPORTANTE: Detectamos si es HTML (Imagen/PDF) o Texto (UVL)
+                if (data.content.trim().startsWith('<div') || data.content.trim().startsWith('<iframe')) {
+                    // Si es HTML, lo interpretamos para que se vea la imagen/PDF
+                    fileContent.innerHTML = data.content;
+                    // Quitamos el estilo de "código" para que se vea limpio
+                    fileContent.style.backgroundColor = "transparent";
+                    fileContent.style.border = "none";
+                } else {
+                    // Si es texto (UVL), usamos textContent por seguridad y mantenemos el estilo de código
+                    fileContent.textContent = data.content;
+                    fileContent.style.backgroundColor = "#f5f5f5";
+                    fileContent.style.border = "1px solid #ccc";
+                }
+
                 currentFileId = fileId;
                 document.getElementById('downloadButton').href = `/file/download/${fileId}`;
                 var modal = new bootstrap.Modal(document.getElementById('fileViewerModal'));

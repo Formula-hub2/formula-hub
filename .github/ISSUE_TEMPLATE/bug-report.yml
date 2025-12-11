@@ -1,0 +1,97 @@
+name: "🐛 Bug Report"
+description: "Report a bug in FormulaHub"
+title: "[Fix] "
+labels: ["Fix", "needs-review"]
+assignees: []
+projects: ["Formula-hub2"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🐛 Report a Bug
+        Thanks for helping us improve FormulaHub2! Please fill out this form completely so we can fix the issue quickly.
+
+        ---
+
+  - type: input
+    id: short-description
+    attributes:
+      label: "🎯 Short Description"
+      description: "Describe the bug"
+      placeholder: "Example: Shopping cart doesn't show selected datasets when creating new dataset"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: "📋 Steps to Reproduce"
+      description: "Steps to reproduce the issue"
+      placeholder: |
+        1. Go to 'Explore' page
+        2. Click 'Add to my dataset' on any dataset
+        3. Click 'Create my own dataset' button
+        4. Notice that the cart shows empty selection
+      render: bash
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "⚠️ Severity Level"
+      description: "How critical is this?"
+      options:
+        - "🚨 Critical (Can't use FormulaHub)"
+        - "🔴 High (Major feature broken)"
+        - "🟡 Medium (Minor issue)"
+        - "🟢 Low (UI issue)"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: components
+    attributes:
+      label: "🔧 Affected Components"
+      description: "Which parts of FormulaHub are affected?"
+      options:
+        - label: "🎯 Explore page / Dataset browser"
+        - label: "🛒 Shopping cart functionality"
+        - label: "📊 Dataset creation/combination"
+        - label: "📥 Dataset download/export"
+        - label: "🔐 Authentication/User Profile"
+        - label: "📱 UI/Responsive design"
+        - label: "⚡  Load times"
+        - label: "🔧 Other (specify below)"
+
+  - type: input
+    id: expected-behavior
+    attributes:
+      label: "✅ Expected Behavior"
+      description: "What should have happened?"
+      placeholder: "The modal should display the selected datasets with their titles"
+    validations:
+      required: true
+
+  - type: input
+    id: actual-behavior
+    attributes:
+      label: "❌ Actual Behavior"
+      description: "What actually happened?"
+      placeholder: "The modal shows 'No datasets selected' even though items were added to cart"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: "🌍 Environment"
+      placeholder: "Chrome, Windows 11"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: "📸 Additional info (screenshots, errors)"
+      placeholder: "Paste error messages or add screenshots"
