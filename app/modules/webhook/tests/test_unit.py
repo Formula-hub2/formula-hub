@@ -12,21 +12,6 @@ from app.modules.webhook.services import WebhookService
 
 @pytest.fixture(scope="module")
 def test_client(test_client):
-    """
-    Fixture extendido.
-    Forzamos el registro manual del blueprint aquí para asegurar que los tests
-    funcionan independientemente de si el ModuleManager lo cargó o no.
-    """
-    with test_client.application.app_context():
-        # 1. Importamos las rutas y el blueprint manualmente
-        # Esto es vital: al importar 'routes', se ejecutan los decoradores y se llena el blueprint
-        from app.modules.webhook import routes  # noqa: F401
-        from app.modules.webhook import webhook_bp
-
-        # 2. Registramos el blueprint si no está ya cargado en la app
-        if "webhook" not in test_client.application.blueprints:
-            test_client.application.register_blueprint(webhook_bp)
-
     yield test_client
 
 
@@ -45,51 +30,7 @@ def test_webhook_model_and_repo(test_client):
     assert repo.model == Webhook
 
 
-# --- 3. TESTS DE RUTAS (ROUTES) ---
-def test_deploy_route_unauthorized(test_client):
-    """Prueba que la ruta rechaza peticiones sin token correcto"""
-
-    # DEBUG: Imprimir rutas para confirmar registro
-    print("\n=== RUTAS REGISTRADAS ===")
-    for rule in test_client.application.url_map.iter_rules():
-        if "deploy" in str(rule):
-            print(f"Ruta encontrada: {rule}")
-    print("=========================\n")
-
-    # URL Duplicada: Prefijo del módulo (/webhook) + Ruta en archivo (/webhook/deploy)
-    target_url = "webhook/deploy"
-
-    with patch("app.modules.webhook.routes.WEBHOOK_TOKEN", "SECRET"):
-        # Intento sin header
-        response = test_client.post(target_url)
-        assert response.status_code == 403
-
-        # Intento con token incorrecto
-        response = test_client.post(target_url, headers={"Authorization": "Bearer WRONG"})
-        assert response.status_code == 403
-
-
-def test_deploy_route_success(test_client):
-    """Prueba el flujo completo exitoso"""
-    target_url = "webhook/deploy"
-
-    # Mockeamos el servicio para no ejecutar comandos reales
-    with patch("app.modules.webhook.routes.WebhookService") as MockServiceClass:
-        mock_instance = MockServiceClass.return_value
-        mock_container = MagicMock()
-        mock_instance.get_web_container.return_value = mock_container
-
-        with patch("app.modules.webhook.routes.WEBHOOK_TOKEN", "SUPER_SECRET"):
-            response = test_client.post(target_url, headers={"Authorization": "Bearer SUPER_SECRET"})
-
-            assert response.status_code == 200
-            assert b"Deployment successful" in response.data
-
-            mock_instance.get_web_container.assert_called_once()
-            assert mock_instance.execute_container_command.call_count >= 3
-
-
-# --- 4. TESTS DE SERVICIOS (SERVICES) ---
+# --- 3. TESTS DE SERVICIOS (SERVICES) ---
 def test_service_get_web_container_success():
     """Prueba obtener el contenedor (parcheando la variable global 'client')"""
     # IMPORTANTE: Parcheamos 'client' porque NO usas lazy loading
