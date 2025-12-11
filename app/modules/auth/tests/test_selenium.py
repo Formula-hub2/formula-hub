@@ -295,7 +295,6 @@ def test_view_and_terminate_sessions():
             print(f"ℹ️ {e}")
             try:
                 driver.save_screenshot("debug_sessions_page.png")
-                print("📸 debug_sessions_page.png")
             except Exception:
                 pass
             assert True
@@ -565,11 +564,6 @@ def test_active_sessions_complete_workflow():
         initial_url = driver.current_url
 
         print("3. Capturando información de sesiones...")
-        try:
-            driver.save_screenshot("active_sessions_initial.png")
-            print("   📸 Captura inicial guardada: active_sessions_initial.png")
-        except Exception:
-            pass
 
         print("4. Interactuando con elementos de la página...")
 

@@ -151,14 +151,47 @@ class AuthenticationService(BaseService):
             from flask import session as flask_session_obj
 
             flask_session_obj["session_token"] = flask_session_token
+            # Also store the session_id in the flask session so other request
+            # handlers can validate the current session without relying on the
+            # caller to set it.
+            flask_session_obj["session_id"] = session_id
         except RuntimeError:
             pass
 
         return user_session
 
     def get_active_sessions(self, user: User):
-        """Devuelve todas las sesiones activas del usuario."""
-        return UserSession.query.filter_by(user_id=user.id).all()
+        """Devuelve sesiones activas del usuario.
+
+        Para la vista de "Sesiones activas" queremos mostrar una entrada por
+        dispositivo/navegador en lugar de listar cada sesión concreta. Agrupamos
+        por `device_id` cuando esté disponible; si no, agrupamos por una clave
+        compuesta de `user_agent` + `ip_address`. De cada grupo devolvemos la
+        sesión más reciente (por `last_activity`).
+        """
+        sessions = UserSession.query.filter_by(user_id=user.id).order_by(UserSession.last_activity.desc()).all()
+
+        grouped = {}
+        result = []
+        import re
+
+        for s in sessions:
+            # Prefer device_id cuando exista (generado y guardado en cookie).
+            # Si no existe usamos user_agent+ip como fallback para identificar
+            # el "dispositivo". Normalizamos el user_agent (espacios y case)
+            # para evitar duplicados por pequeñas diferencias en la cadena.
+            if s.device_id:
+                key = s.device_id
+            else:
+                ua = (s.user_agent or "").strip()
+                ua = re.sub(r"\s+", " ", ua).lower()
+                key = f"{ua}|{(s.ip_address or '')}"
+
+            if key not in grouped:
+                grouped[key] = s
+                result.append(s)
+
+        return result
 
     def terminate_session(self, session_id: str):
         """Elimina una sesión activa específica."""

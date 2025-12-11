@@ -74,7 +74,13 @@ def view_file(file_id):
 
             if ext in [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"]:
                 # Si es imagen, devolvemos una etiqueta IMG
-                content = f'<div style="text-align: center;"><img src="{download_url}" style="max-width: 100%; max-height: 600px; border-radius: 4px;" alt="Image preview"></div>'
+                content = (
+                    f'<div style="text-align: center;">'
+                    f'<img src="{download_url}" '
+                    f'style="max-width: 100%; max-height: 600px; border-radius: 4px;" '
+                    f'alt="Image preview">'
+                    f"</div>"
+                )
 
             elif ext == ".pdf":
                 # Si es PDF, devolvemos un IFRAME
