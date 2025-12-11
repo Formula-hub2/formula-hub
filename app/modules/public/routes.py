@@ -1,8 +1,9 @@
 import logging
 
-from flask import render_template
+from flask import current_app, flash, make_response, redirect, render_template, session, url_for
+from flask_login import current_user, logout_user
 
-from app.modules.auth.routes import require_valid_session
+from app.modules.auth.services import AuthenticationService
 from app.modules.dataset.services import DataSetService
 from app.modules.featuremodel.services import FeatureModelService
 from app.modules.public import public_bp
@@ -11,9 +12,45 @@ logger = logging.getLogger(__name__)
 
 
 @public_bp.route("/")
-@require_valid_session
 def index():
     logger.info("Access index")
+
+    # If the user is authenticated, ensure the session is still valid. If not,
+    # force server-side logout and clear the remember cookie so the client won't
+    # be auto-logged-in again.
+    try:
+        if current_user.is_authenticated:
+            auth_service = AuthenticationService()
+            if not auth_service.is_current_session_valid():
+                logout_user()
+                session.clear()
+                flash("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
+                # Redirect to the login page (exempt from session validation)
+                # to avoid redirect loops when the public index is checked.
+                resp = make_response(redirect(url_for("auth.login")))
+                remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+                resp.delete_cookie(
+                    remember_cookie_name,
+                    path=current_app.config.get("REMEMBER_COOKIE_PATH", "/"),
+                    domain=current_app.config.get("REMEMBER_COOKIE_DOMAIN"),
+                )
+                return resp
+    except Exception:
+        # If something goes wrong during validation, log out defensively.
+        try:
+            logout_user()
+            session.clear()
+        except Exception:
+            pass
+        resp = make_response(redirect(url_for("auth.login")))
+        remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+        resp.delete_cookie(
+            remember_cookie_name,
+            path=current_app.config.get("REMEMBER_COOKIE_PATH", "/"),
+            domain=current_app.config.get("REMEMBER_COOKIE_DOMAIN"),
+        )
+        return resp
+
     dataset_service = DataSetService()
     feature_model_service = FeatureModelService()
 

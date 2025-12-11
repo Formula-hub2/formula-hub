@@ -1,6 +1,7 @@
 import os
 from functools import wraps
 
+from flask import current_app
 from flask import flash
 from flask import flash as flask_flash_func
 from flask import make_response, redirect, render_template, request
@@ -27,6 +28,78 @@ authentication_service = AuthenticationService()
 user_profile_service = UserProfileService()
 
 
+# Global check: ensure that any request from an authenticated user belongs to a
+# still-valid UserSession. If the DB row was removed (remote logout), force a
+# server-side logout and return a response that clears the remember cookie so
+# the client won't be auto-logged-in again. This runs before every request and
+# covers routes that aren't decorated with `require_valid_session`.
+@auth_bp.before_app_request
+def ensure_session_is_valid():
+    # Only act for authenticated users
+    try:
+        if not current_user.is_authenticated:
+            return None
+
+        # Avoid interfering with auth endpoints themselves or static files
+        endpoint = None
+        try:
+            endpoint = request.endpoint
+        except Exception:
+            endpoint = None
+
+        exempt_endpoints = {
+            "auth.login",
+            "auth.logout",
+            "auth.verify_2fa",
+            "auth.check_session",
+            "auth.show_signup_form",
+        }
+        # Only skip for auth endpoints and static files. Do NOT skip public
+        # endpoints: we must validate sessions even when the user requests the
+        # main page so we can force a logout+redirect there.
+        if endpoint is not None and (endpoint in exempt_endpoints or endpoint.startswith("static")):
+            return None
+
+        if not authentication_service.is_current_session_valid():
+            current_app.logger.info(
+                "Detected invalid session for user=%s, forcing logout", getattr(current_user, "id", None)
+            )
+            # server-side logout and clear
+            logout_user()
+            session.clear()
+            flask_flash_func("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
+            # Build a response that clears the remember cookie on the client and
+            # redirects to the public index (main page) as requested by product
+            # behaviour.
+            # Redirect to the login page (exempt from validation) to avoid
+            # triggering this same handler again and creating redirect loops.
+            resp = make_response(redirect(url_for("auth.login")))
+            remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+            # Ensure we clear cookie with same path/domain as login manager uses
+            resp.delete_cookie(
+                remember_cookie_name,
+                path=current_app.config.get("REMEMBER_COOKIE_PATH", "/"),
+                domain=current_app.config.get("REMEMBER_COOKIE_DOMAIN"),
+            )
+            return resp
+    except Exception:
+        # On any error while validating the session, be conservative: logout
+        # and force the client to a non-authenticated state.
+        try:
+            logout_user()
+            session.clear()
+        except Exception:
+            pass
+        resp = make_response(redirect(url_for("auth.login")))
+        remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+        resp.delete_cookie(
+            remember_cookie_name,
+            path=current_app.config.get("REMEMBER_COOKIE_PATH", "/"),
+            domain=current_app.config.get("REMEMBER_COOKIE_DOMAIN"),
+        )
+        return resp
+
+
 def require_valid_session(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -36,12 +109,19 @@ def require_valid_session(f):
                     logout_user()
                     flask_session_obj.clear()
                     flask_flash_func("Tu sesión ha sido cerrada desde otro dispositivo.", "warning")
-                    return redirect(url_for("auth.login"))
+                    # Build a response so we can ensure the remember cookie is removed on the client
+                    resp = make_response(redirect(url_for("auth.login")))
+                    remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+                    resp.delete_cookie(remember_cookie_name)
+                    return resp
             except Exception:
                 logout_user()
                 flask_session_obj.clear()
                 flask_flash_func("Error validando tu sesión. Por favor, inicia sesión nuevamente.", "warning")
-                return redirect(url_for("auth.login"))
+                resp = make_response(redirect(url_for("auth.login")))
+                remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+                resp.delete_cookie(remember_cookie_name)
+                return resp
         return f(*args, **kwargs)
 
     return decorated_function
@@ -64,6 +144,19 @@ def show_signup_form():
             return render_template("auth/signup_form.html", form=form, error=f"Error creating user: {exc}")
 
         login_user(user, remember=True)
+        # Create a corresponding UserSession so subsequent requests (e.g. the
+        # redirect to public.index) are considered valid by
+        # is_current_session_valid(). This mirrors the behavior in the
+        # `login` route.
+        try:
+            user_session = authentication_service.create_user_session(user)
+            session["session_id"] = user_session.session_id
+        except Exception:
+            # If session creation fails, continue with login but be defensive
+            # — the before_request will handle invalid sessions and force a
+            # logout if necessary.
+            pass
+
         return redirect(url_for("public.index"))
 
     return render_template("auth/signup_form.html", form=form)
@@ -157,10 +250,14 @@ def logout():
         current_session_id = session.get("session_id")
         if current_session_id:
             authentication_service.terminate_session(current_session_id)
-
+    # Clear server session and logout
     session.clear()
     logout_user()
-    return redirect(url_for("public.index"))
+    # Make sure the remember cookie is removed from the client
+    resp = make_response(redirect(url_for("public.index")))
+    remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+    resp.delete_cookie(remember_cookie_name)
+    return resp
 
 
 @auth_bp.route("/active_sessions")
@@ -199,7 +296,11 @@ def check_session():
     if not authentication_service.is_current_session_valid():
         logout_user()
         session.clear()
-        return "", 401
+        # return a response that clears the remember cookie so the client won't be auto-logged-in
+        resp = make_response(("", 401))
+        remember_cookie_name = current_app.config.get("REMEMBER_COOKIE_NAME", "remember_token")
+        resp.delete_cookie(remember_cookie_name)
+        return resp
     return "", 200
 
 
