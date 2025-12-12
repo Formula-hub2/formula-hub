@@ -7,9 +7,9 @@ import uuid
 from datetime import datetime, timezone
 from zipfile import ZipFile
 
-from flask import abort, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
+from flask import abort, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
-
+from app.modules.fakenodo.services import service as fakenodo_service
 from app import db
 from app.modules.dataset import dataset_bp
 from app.modules.dataset.forms import DataSetForm, RawDataSetForm
@@ -24,111 +24,91 @@ from app.modules.dataset.services import (
     RawDataSetService,
     UVLDataSetService,
 )
-from app.modules.zenodo.services import ZenodoService
 
 logger = logging.getLogger(__name__)
-
+from app.modules.fakenodo.services import FakenodoService
 # Instanciamos los servicios genéricos (para lecturas, listados, etc.)
 dataset_service = DataSetService()
 author_service = AuthorService()
 dsmetadata_service = DSMetaDataService()
-zenodo_service = ZenodoService()
+fakenodo_service = FakenodoService()
 doi_mapping_service = DOIMappingService()
 ds_view_record_service = DSViewRecordService()
 
 
-@dataset_bp.route("/dataset/upload", defaults={"dataset_type": "uvl"}, methods=["GET", "POST"])
-@dataset_bp.route("/dataset/upload/<dataset_type>", methods=["GET", "POST"])
+
+from app.modules.fakenodo.services import service as fakenodo_service
+from app import db
+
+
+@dataset_bp.route("/dataset/upload", methods=["GET", "POST"])
 @login_required
-def create_dataset(dataset_type):
-    """
-    Controlador Polimórfico de Subida.
-    Selecciona el servicio y el formulario adecuado según el tipo de dataset.
-    """
-
-    # 1. FACTORY: Selección de Estrategia
-    if dataset_type == "uvl":
-        service = UVLDataSetService()
-        form = DataSetForm()
-        template = "dataset/upload_dataset.html"
-
-    elif dataset_type == "raw":
-        service = RawDataSetService()
-        form = RawDataSetForm()
-        template = "dataset/upload_raw.html"
-
-    else:
-        return abort(404, description=f"Dataset type '{dataset_type}' not supported yet.")
-
+def create_dataset():
+    form = DataSetForm()
     if request.method == "POST":
-        dataset = None
-
-        if not form.validate_on_submit():
-            return jsonify({"message": form.errors}), 400
-
-        try:
-            logger.info(f"Creating dataset of type {dataset_type}...")
-
-            # 2. DELEGACIÓN: El servicio específico se encarga de la creación
-            dataset = service.create_from_form(form=form, current_user=current_user)
-
-            logger.info(f"Created dataset: {dataset}")
-
-            # Lógica específica de movimiento de ficheros (Solo para UVL por ahora)
-            if dataset_type == "uvl":
-                service.move_feature_models(dataset)
-
-        except Exception as exc:
-            logger.exception(f"Exception while create dataset data in local {exc}")
-            return jsonify({"Exception while create dataset data in local: ": str(exc)}), 400
-
-        # 3. SINCRONIZACIÓN ZENODO (Lógica Común)
-        # Nota: Esto asume que Zenodo acepta cualquier tipo de fichero que subamos.
-        # Si el dataset es 'raw' y no tiene ficheros aún, esto subirá solo metadatos.
-        data = {}
-        try:
-            zenodo_response_json = zenodo_service.create_new_deposition(dataset)
-            response_data = json.dumps(zenodo_response_json)
-            data = json.loads(response_data)
-        except Exception as exc:
-            data = {}
-            zenodo_response_json = {}
-            logger.exception(f"Exception while create dataset data in Zenodo {exc}")
-
-        if data.get("conceptrecid"):
-            deposition_id = data.get("id")
-
-            # update dataset with deposition id in Zenodo
-            dataset_service.update_dsmetadata(dataset.ds_meta_data_id, deposition_id=deposition_id)
-
+        if form.validate_on_submit():
             try:
-                # Subida de ficheros a Zenodo
-                # Si es UVL, subimos los feature models.
-                # Si es Raw, en el futuro habrá que implementar su lógica de subida de ficheros.
-                if hasattr(dataset, "feature_models"):
-                    for feature_model in dataset.feature_models:
-                        zenodo_service.upload_file(dataset, deposition_id, feature_model)
+                # 1. Creación del dataset local (ESTO SE MANTIENE IGUAL)
+                logger.info("Creating dataset...")
+                service = UVLDataSetService()
+                dataset = service.create_from_form(form=form, current_user=current_user)
+                logger.info(f"Created dataset: {dataset}")
 
-                # publish deposition
-                zenodo_service.publish_deposition(deposition_id)
+                # =======================================================
+                # BLOQUE MODIFICADO: CONEXIÓN A FAKENODO (Mock)
+                # =======================================================
+                try:
+                    logger.info("Connecting to Fakenodo (Mock)...")
+                    
+                    # A. Crear depósito en Fakenodo
+                    # Usamos el título del formulario
+                    fake_meta = {"title": dataset.ds_meta_data.title}
+                    deposition = fakenodo_service.create_deposition(metadata=fake_meta)
+                    deposition_id = deposition.get("id")
 
-                # update DOI
-                deposition_doi = zenodo_service.get_doi(deposition_id)
-                dataset_service.update_dsmetadata(dataset.ds_meta_data_id, dataset_doi=deposition_doi)
-            except Exception as e:
-                msg = f"it has not been possible upload feature models in Zenodo and update the DOI: {e}"
-                return jsonify({"message": msg}), 200
+                    # B. Simular subida de archivos
+                    # Recorremos los modelos para 'fingir' que los subimos al mock
+                    for fm in dataset.feature_models:
+                        for file in fm.files:
+                            # Subimos contenido dummy o real, para el mock basta el nombre
+                            fakenodo_service.upload_file(
+                                deposition_id, 
+                                file.name, 
+                                b"mock_content_for_speed"
+                            )
 
-        # Delete temp folder (Limpieza)
-        file_path = current_user.temp_folder()
-        if os.path.exists(file_path) and os.path.isdir(file_path):
-            shutil.rmtree(file_path)
+                    # C. Publicar en Fakenodo (Genera el DOI)
+                    published_dep = fakenodo_service.publish_deposition(deposition_id)
+                    
+                    # D. Guardar el DOI falso en tu base de datos local
+                    if published_dep and published_dep.get("doi"):
+                        dataset.ds_meta_data.deposition_id = deposition_id
+                        dataset.ds_meta_data.dataset_doi = published_dep.get("doi")
+                        db.session.commit()
+                        
+                    flash("Dataset uploaded and synced with Fakenodo!", "success")
 
-        msg = "Everything works!"
-        return jsonify({"message": msg}), 200
+                except Exception as e:
+                    # Si falla Fakenodo, no borramos el dataset local, solo avisamos
+                    logger.error(f"Error en Fakenodo: {e}")
+                    flash("Dataset saved locally, but Fakenodo sync failed.", "warning")
 
-    return render_template(template, form=form)
+                return jsonify({"message": "Dataset created successfully!"}), 200
 
+            except Exception as exc:
+                logger.exception(f"Exception while create dataset: {exc}")
+                return jsonify({"message": f"General error: {str(exc)}"}), 500
+        else:
+             return jsonify({"message": "Form validation failed"}), 400
+
+    return render_template("dataset/upload_dataset.html", form=form)
+
+@dataset_bp.route("/dataset/<int:dataset_id>/duplicate", methods=["POST", "GET"])
+@login_required
+def duplicate_dataset(dataset_id):
+    service = DataSetService()
+    service.duplicate_dataset(dataset_id, current_user.id)
+    return redirect(url_for("dataset.list_dataset"))
 
 @dataset_bp.route("/dataset/list", methods=["GET", "POST"])
 @login_required

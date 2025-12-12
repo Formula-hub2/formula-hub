@@ -1,0 +1,146 @@
+{% extends "base_template.html" %}
+
+{% block title %}Fakenodo — Mock Repository{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <header class="mb-4">
+    <h1 class="h3">Fakenodo — Test Environment</h1>
+    <p class="text-muted">This mock service is intended for local development: create deposits, upload files and issue fake DOIs.</p>
+  </header>
+
+  <section class="mb-4">
+    <div class="row">
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-body">
+            <h2 class="h6">Available routes</h2>
+            <p class="small text-muted mb-3">Minimal set of endpoints provided by the mock:</p>
+
+            <div class="table-responsive">
+              <table class="table table-sm">
+                <thead> <tr>
+                    <th>Method</th>
+                    <th>Path</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="badge bg-success">POST</span></td>
+                    <td><code>/fakenodo/deposit/depositions</code></td>
+                    <td>Create a new deposit</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge bg-info">GET</span></td>
+                    <td><code>/fakenodo/deposit/depositions</code></td>
+                    <td>List all deposits</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge bg-info">GET</span></td>
+                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;</code></td>
+                    <td>Get deposit details</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge bg-danger">DELETE</span></td>
+                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;</code></td>
+                    <td>Delete a deposit</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge bg-success">POST</span></td>
+                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;/files</code></td>
+                    <td>Upload a file to a deposit</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge bg-warning">POST</span></td>
+                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;/actions/publish</code></td>
+                    <td>Publish deposit (assigns fake DOI)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="card mb-3">
+          <div class="card-body">
+            <h3 class="h6">Check connection</h3>
+            <p class="small text-muted">Call the mock status endpoint below.</p>
+            <a href="{{ url_for('fakenodo.test_endpoint') }}" class="btn btn-outline-primary w-100">Check Fakenodo</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <h3 class="h6">Quick examples</h3>
+            <pre class="small bg-light p-2"><code>curl -X POST -H 'Content-Type: application/json' \
+  -d '{"metadata":{"title":"Test"}}' \
+  {{ request.url_root }}fakenodo/deposit/depositions</code></pre>
+
+            <pre class="small bg-light p-2"><code>curl {{ request.url_root }}fakenodo/deposit/depositions</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h6">Notes</h2>
+        <ul>
+          <li class="small text-muted">Generated DOIs are mock values and not valid identifiers.</li>
+          <li class="small text-muted">Data is stored in memory only — restarting the app clears all deposits.</li>
+        </ul>
+      </div> </div>
+  </section>
+
+  <section class="mt-4">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h6">Deposits</h2>
+        {% if deposits %}
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Dataset</th>
+                <th>DOI</th>
+                <th>Published</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in deposits %}
+              <tr>
+                <td>{{ d.id }}</td>
+                <td>{{ d.metadata.title if d.metadata and d.metadata.title else (d.metadata.get('title') if d.metadata else '') }}</td>
+                <td>{% if d.dataset_id %}<a href="/dataset/view/{{ d.dataset_id }}">{{ d.dataset_id }}</a>{% else %}-{% endif %}</td>
+                <td>{{ d.doi or '-' }}</td>
+                <td>{% if d.published %}Yes{% else %}No{% endif %}</td>
+                <td>
+                  {% if not d.published %}
+                  <form method="post" action="{{ url_for('fakenodo.publish_deposition', deposition_id=d.id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-primary">Publish & Sync</button>
+                  </form>
+                  {% else %}
+                  <button class="btn btn-sm btn-secondary" disabled>Published</button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="small text-muted">No deposits created yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

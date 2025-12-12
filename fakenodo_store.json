@@ -1,0 +1,25 @@
+{
+    "1000": {
+        "id": 1000,
+        "conceptrecid": 999,
+        "created": "2025-12-12T17:19:24.359153",
+        "modified": "2025-12-12T17:19:24.360295",
+        "metadata": {
+            "title": "prueba"
+        },
+        "title": "prueba",
+        "files": [
+            {
+                "id": "1",
+                "filename": "ferrari_sf24 (2).uvl",
+                "filesize": 22,
+                "checksum": "md5:-1819043826316321685"
+            }
+        ],
+        "doi": "10.5072/zenodo.1000",
+        "state": "done",
+        "submitted": true,
+        "version_count": 1,
+        "dirty_files": false
+    }
+}
