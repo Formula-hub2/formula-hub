@@ -1,8 +1,5 @@
-import os
-from typing import Any, Dict
-
 from flask import current_app, flash, jsonify, redirect, render_template, request, send_from_directory, url_for
-from flask_login import current_user, login_required
+from flask_login import current_user
 
 from app import db
 from app.modules.dataset.models import DSMetaData
@@ -35,7 +32,7 @@ def list_depositions():
 @fakenodo_bp.route("/deposit/depositions/<int:deposition_id>", methods=["GET"], endpoint="get_deposition")
 def get_deposition(deposition_id: int):
     rec = fakenodo_service.get_deposition(deposition_id)
-    
+
     # 1. Si no existe el depósito
     if not rec:
         return jsonify({"message": "Depósito no encontrado"}), 404
@@ -43,7 +40,7 @@ def get_deposition(deposition_id: int):
     # 2. Si es el navegador (pide HTML), mostramos la plantilla bonita
     if request.accept_mimetypes.accept_html:
         return render_template("fakenodo/deposition.html", deposit=rec)
-    
+
     # 3. Si es la API (pide JSON), devolvemos los datos crudos
     return jsonify(rec), 200
 
@@ -131,7 +128,7 @@ def update_deposition_metadata(deposition_id: int):
             {
                 "id": deposition_id,
                 "metadata": updated.get("metadata"),
-                "dirty": updated.get("dirty_files"), # Corregido para usar nombre interno del servicio
+                "dirty": updated.get("dirty_files"),  # Corregido para usar nombre interno del servicio
                 "versions": versions,
             }
         ),
@@ -153,6 +150,7 @@ def test_endpoint():
 
 
 # --- Dataset Integration Proxies ---
+
 
 @fakenodo_bp.route("/dataset/<int:dataset_id>/sync", methods=["GET", "POST"], endpoint="dataset_sync_proxy")
 def dataset_sync_proxy(dataset_id=None):
@@ -238,7 +236,8 @@ def publish_or_create_dataset_deposition(dataset_id: int):
 
     return redirect(url_for("dataset.list_dataset"))
 
-@fakenodo_bp.route('/scripts.js')
+
+@fakenodo_bp.route("/scripts.js")
 def scripts():
     return send_from_directory(fakenodo_bp.static_folder, "scripts.js")
 
@@ -252,22 +251,18 @@ def visualize_local_dataset(dataset_id):
     # 1. Obtenemos el dataset real de la base de datos
     ds_service = DataSetService()
     dataset = ds_service.repository.get_by_id(dataset_id)
-    
+
     if not dataset:
         return render_template("404.html"), 404
 
     # 2. Construimos un objeto 'falso' que tenga la estructura que espera la plantilla
     # La plantilla espera: deposit.metadata.title, deposit.files, deposit.doi, etc.
-    
+
     # Recopilamos archivos
     files_list = []
     for fm in dataset.feature_models:
         for f in fm.files:
-            files_list.append({
-                "filename": f.name,
-                "checksum": f.checksum,
-                "filesize": f.size
-            })
+            files_list.append({"filename": f.name, "checksum": f.checksum, "filesize": f.size})
 
     fake_deposit = {
         "id": dataset.id,
@@ -275,12 +270,12 @@ def visualize_local_dataset(dataset_id):
             "title": dataset.ds_meta_data.title,
             "description": dataset.ds_meta_data.description,
         },
-        "title": dataset.ds_meta_data.title, # Por si acaso
+        "title": dataset.ds_meta_data.title,  # Por si acaso
         "doi": dataset.ds_meta_data.dataset_doi or "Internal-ID",
-        "created": dataset.created_at.strftime('%Y-%m-%d') if dataset.created_at else "Unknown",
+        "created": dataset.created_at.strftime("%Y-%m-%d") if dataset.created_at else "Unknown",
         "modified": "Simulated View",
         "version_count": 1,
-        "files": files_list
+        "files": files_list,
     }
 
     # 3. Renderizamos la MISMA plantilla que usan los de Fakenodo

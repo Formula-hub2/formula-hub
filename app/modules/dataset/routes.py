@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-import shutil
 import tempfile
 import uuid
 from datetime import datetime, timezone
@@ -9,10 +7,10 @@ from zipfile import ZipFile
 
 from flask import abort, flash, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
-from app.modules.fakenodo.services import service as fakenodo_service
+
 from app import db
 from app.modules.dataset import dataset_bp
-from app.modules.dataset.forms import DataSetForm, RawDataSetForm
+from app.modules.dataset.forms import DataSetForm
 from app.modules.dataset.models import DataSet, DSDownloadRecord
 from app.modules.dataset.services import (
     AuthorService,
@@ -21,12 +19,12 @@ from app.modules.dataset.services import (
     DSDownloadRecordService,
     DSMetaDataService,
     DSViewRecordService,
-    RawDataSetService,
     UVLDataSetService,
 )
+from app.modules.fakenodo.services import FakenodoService
 
 logger = logging.getLogger(__name__)
-from app.modules.fakenodo.services import FakenodoService
+
 # Instanciamos los servicios genéricos (para lecturas, listados, etc.)
 dataset_service = DataSetService()
 author_service = AuthorService()
@@ -34,11 +32,6 @@ dsmetadata_service = DSMetaDataService()
 fakenodo_service = FakenodoService()
 doi_mapping_service = DOIMappingService()
 ds_view_record_service = DSViewRecordService()
-
-
-
-from app.modules.fakenodo.services import service as fakenodo_service
-from app import db
 
 
 @dataset_bp.route("/dataset/upload", methods=["GET", "POST"])
@@ -59,7 +52,7 @@ def create_dataset():
                 # =======================================================
                 try:
                     logger.info("Connecting to Fakenodo (Mock)...")
-                    
+
                     # A. Crear depósito en Fakenodo
                     # Usamos el título del formulario
                     fake_meta = {"title": dataset.ds_meta_data.title}
@@ -71,21 +64,17 @@ def create_dataset():
                     for fm in dataset.feature_models:
                         for file in fm.files:
                             # Subimos contenido dummy o real, para el mock basta el nombre
-                            fakenodo_service.upload_file(
-                                deposition_id, 
-                                file.name, 
-                                b"mock_content_for_speed"
-                            )
+                            fakenodo_service.upload_file(deposition_id, file.name, b"mock_content_for_speed")
 
                     # C. Publicar en Fakenodo (Genera el DOI)
                     published_dep = fakenodo_service.publish_deposition(deposition_id)
-                    
+
                     # D. Guardar el DOI falso en tu base de datos local
                     if published_dep and published_dep.get("doi"):
                         dataset.ds_meta_data.deposition_id = deposition_id
                         dataset.ds_meta_data.dataset_doi = published_dep.get("doi")
                         db.session.commit()
-                        
+
                     flash("Dataset uploaded and synced with Fakenodo!", "success")
 
                 except Exception as e:
@@ -99,9 +88,10 @@ def create_dataset():
                 logger.exception(f"Exception while create dataset: {exc}")
                 return jsonify({"message": f"General error: {str(exc)}"}), 500
         else:
-             return jsonify({"message": "Form validation failed"}), 400
+            return jsonify({"message": "Form validation failed"}), 400
 
     return render_template("dataset/upload_dataset.html", form=form)
+
 
 @dataset_bp.route("/dataset/<int:dataset_id>/duplicate", methods=["POST", "GET"])
 @login_required
@@ -109,6 +99,7 @@ def duplicate_dataset(dataset_id):
     service = DataSetService()
     service.duplicate_dataset(dataset_id, current_user.id)
     return redirect(url_for("dataset.list_dataset"))
+
 
 @dataset_bp.route("/dataset/list", methods=["GET", "POST"])
 @login_required

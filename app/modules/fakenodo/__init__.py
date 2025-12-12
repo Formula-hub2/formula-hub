@@ -8,5 +8,3 @@ fakenodo_bp = Blueprint(
     static_folder="assets",
     static_url_path="/fakenodo/static",
 )
-
-from . import routes

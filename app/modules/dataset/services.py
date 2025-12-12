@@ -78,21 +78,20 @@ class DataSetService(BaseService):
         return self.dsmetadata_repository.update(id, **kwargs)
 
     def get_uvlhub_doi(self, dataset: DataSet) -> str:
-            domain = os.getenv("DOMAIN", "localhost")
-            doi = dataset.ds_meta_data.dataset_doi
+        doi = dataset.ds_meta_data.dataset_doi
 
-            # CASO 1: Es un dataset de Fakenodo (Nuevo)
-            if doi and "zenodo" in doi:
-                try:
-                    partes = doi.split("zenodo.")[1].split(".")
-                    dep_id = partes[0]
-                    return url_for('fakenodo.get_deposition', deposition_id=int(dep_id), _external=True)
-                except Exception:
-                    pass 
-            
-            # CASO 2: Es un dataset antiguo (Formula 1, etc.)
-            # En vez de devolver el enlace interno aburrido, lo mandamos al visualizador
-            return url_for('fakenodo.visualize_local_dataset', dataset_id=dataset.id, _external=True)
+        # CASO 1: Es un dataset de Fakenodo (Nuevo)
+        if doi and "zenodo" in doi:
+            try:
+                partes = doi.split("zenodo.")[1].split(".")
+                dep_id = partes[0]
+                return url_for("fakenodo.get_deposition", deposition_id=int(dep_id), _external=True)
+            except Exception:
+                pass
+
+        # CASO 2: Es un dataset antiguo (Formula 1, etc.)
+        # En vez de devolver el enlace interno aburrido, lo mandamos al visualizador
+        return url_for("fakenodo.visualize_local_dataset", dataset_id=dataset.id, _external=True)
 
     def create_combined_dataset(self, current_user, title, description, publication_type, tags, source_dataset_ids):
         """
@@ -187,7 +186,7 @@ class DataSetService(BaseService):
 
         self.repository.session.commit()
         return dataset
-    
+
     def duplicate_dataset(self, dataset_id: int, user_id: int):
         """
         Crea una copia del dataset y sus metadatos.
@@ -205,26 +204,20 @@ class DataSetService(BaseService):
             publication_type=original_meta.publication_type,
             publication_doi=None,
             dataset_doi=None,
-            tags=original_meta.tags
+            tags=original_meta.tags,
         )
-        
+
         # CAMBIO AQUÍ: Usar self.repository.session
         self.repository.session.add(new_meta)
-        self.repository.session.flush() 
+        self.repository.session.flush()
 
         # 3. Crear el nuevo Dataset vinculado al usuario actual
-        new_ds = DataSet(
-            user_id=user_id,
-            ds_meta_data_id=new_meta.id
-        )
+        new_ds = DataSet(user_id=user_id, ds_meta_data_id=new_meta.id)
         self.repository.session.add(new_ds)
-        
+
         # 4. Commit final
         self.repository.session.commit()
         return new_ds
-
-
-
 
 
 # === SERVICIO ESPECÍFICO UVL ===

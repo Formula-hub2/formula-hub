@@ -3,10 +3,12 @@ import json
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+
 from flask import jsonify
 
 # Archivo donde se guardarán los datos (en la raíz del proyecto o carpeta temporal)
 DB_FILE = "fakenodo_store.json"
+
 
 class FakenodoService:
     """
@@ -18,7 +20,7 @@ class FakenodoService:
         self.db_path = os.path.abspath(DB_FILE)
         self._store: Dict[int, Dict[str, Any]] = {}
         self._id_seq = itertools.count(1000)
-        
+
         # Cargar datos al iniciar
         self._load_db()
 
@@ -26,11 +28,11 @@ class FakenodoService:
         """Carga los datos del archivo JSON si existe."""
         if os.path.exists(self.db_path):
             try:
-                with open(self.db_path, 'r') as f:
+                with open(self.db_path, "r") as f:
                     data = json.load(f)
                     # Convertir claves de string a int (JSON guarda keys como strings)
                     self._store = {int(k): v for k, v in data.items()}
-                    
+
                 # Restaurar el contador de IDs para que no se repitan
                 if self._store:
                     last_id = max(self._store.keys())
@@ -46,7 +48,7 @@ class FakenodoService:
     def _save_db(self):
         """Guarda el estado actual en el archivo JSON."""
         try:
-            with open(self.db_path, 'w') as f:
+            with open(self.db_path, "w") as f:
                 json.dump(self._store, f, indent=4)
         except Exception as e:
             print(f"Error guardando Fakenodo DB: {e}")
@@ -55,7 +57,7 @@ class FakenodoService:
         dep_id = next(self._id_seq)
         now = datetime.utcnow().isoformat()
         meta = metadata.copy() if isinstance(metadata, dict) else {}
-        
+
         record = {
             "id": dep_id,
             "conceptrecid": dep_id - 1,
@@ -68,7 +70,7 @@ class FakenodoService:
             "state": "unsubmitted",
             "submitted": False,
             "version_count": 0,
-            "dirty_files": False 
+            "dirty_files": False,
         }
         self._store[dep_id] = record
         self._save_db()  # <--- GUARDAR
@@ -95,10 +97,10 @@ class FakenodoService:
         current_meta = record.get("metadata", {})
         current_meta.update(metadata)
         record["metadata"] = current_meta
-        
+
         if "title" in metadata:
             record["title"] = metadata["title"]
-        
+
         record["modified"] = datetime.utcnow().isoformat()
         self._save_db()  # <--- GUARDAR
         return record
@@ -127,7 +129,7 @@ class FakenodoService:
         record["dirty_files"] = True
         record["modified"] = datetime.utcnow().isoformat()
         self._save_db()  # <--- GUARDAR
-        
+
         return file_info
 
     def publish_deposition(self, deposition_id: int) -> Optional[Dict[str, Any]]:
@@ -141,12 +143,12 @@ class FakenodoService:
             record["version_count"] = 1
             record["doi"] = f"10.5072/zenodo.{record['id']}"
             record["dirty_files"] = False
-        
+
         elif record["dirty_files"]:
             record["version_count"] += 1
             record["doi"] = f"10.5072/zenodo.{record['id']}.{record['version_count']}"
             record["dirty_files"] = False
-        
+
         record["modified"] = datetime.utcnow().isoformat()
         self._save_db()  # <--- GUARDAR
         return record
@@ -159,23 +161,21 @@ class FakenodoService:
         record = self._store.get(deposition_id)
         if not record or record.get("version_count", 0) == 0:
             return []
-            
+
         count = record["version_count"]
         versions = []
         base_doi = f"10.5072/zenodo.{record['id']}"
-        
+
         for i in range(1, count + 1):
             ver_doi = base_doi if i == 1 else f"{base_doi}.{i}"
-            versions.append({
-                "version": str(i),
-                "doi": ver_doi,
-                "created": record["created"],
-                "is_latest": (i == count)
-            })
+            versions.append(
+                {"version": str(i), "doi": ver_doi, "created": record["created"], "is_latest": (i == count)}
+            )
         return versions
 
     def test_full_connection(self):
         return jsonify({"success": True, "message": "Fakenodo persistent service is running."})
+
 
 # Instancia singleton para importar
 service = FakenodoService()
