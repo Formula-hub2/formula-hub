@@ -1,0 +1,13 @@
+features
+    Ferrari_Car
+        mandatory
+            Engine
+                mandatory
+                    V6_Turbo
+            Chassis
+                mandatory
+                    Maranello_Red
+            Strategy
+                optional
+                    Plan_B
+                    Plan_C

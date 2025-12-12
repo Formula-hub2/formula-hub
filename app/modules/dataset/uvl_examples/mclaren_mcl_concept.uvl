@@ -1,0 +1,12 @@
+features
+    McLaren_Car
+        mandatory
+            Engine
+                mandatory
+                    Mercedes_Customer_PU
+            Livery
+                mandatory
+                    Papaya_Orange
+            Technologies
+                optional
+                    Chrome_Wheels

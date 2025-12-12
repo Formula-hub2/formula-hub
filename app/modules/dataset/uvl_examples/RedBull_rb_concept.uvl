@@ -1,0 +1,12 @@
+features
+    RB_Car
+        mandatory
+            Powertrain
+                mandatory
+                    Honda_RBPT
+            Aerodynamics
+                mandatory
+                    Newey_Design
+            Driver
+                mandatory
+                    Max_Verstappen
