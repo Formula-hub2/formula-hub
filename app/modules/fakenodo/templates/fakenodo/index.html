@@ -1,146 +1,212 @@
 {% extends "base_template.html" %}
 
-{% block title %}Fakenodo — Mock Repository{% endblock %}
+{% block title %}Fakenodo Dashboard{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <header class="mb-4">
-    <h1 class="h3">Fakenodo — Test Environment</h1>
-    <p class="text-muted">This mock service is intended for local development: create deposits, upload files and issue fake DOIs.</p>
-  </header>
 
-  <section class="mb-4">
-    <div class="row">
-      <div class="col-md-8">
-        <div class="card">
-          <div class="card-body">
-            <h2 class="h6">Available routes</h2>
-            <p class="small text-muted mb-3">Minimal set of endpoints provided by the mock:</p>
+<h1 class="h2 mb-3">Fakenodo — Test Environment</h1>
+<p class="text-muted">This mock service is intended for local development: create deposits, upload files and issue fake DOIs.</p>
 
-            <div class="table-responsive">
-              <table class="table table-sm">
-                <thead> <tr>
-                    <th>Method</th>
-                    <th>Path</th>
-                    <th>Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><span class="badge bg-success">POST</span></td>
-                    <td><code>/fakenodo/deposit/depositions</code></td>
-                    <td>Create a new deposit</td>
-                  </tr>
-                  <tr>
-                    <td><span class="badge bg-info">GET</span></td>
-                    <td><code>/fakenodo/deposit/depositions</code></td>
-                    <td>List all deposits</td>
-                  </tr>
-                  <tr>
-                    <td><span class="badge bg-info">GET</span></td>
-                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;</code></td>
-                    <td>Get deposit details</td>
-                  </tr>
-                  <tr>
-                    <td><span class="badge bg-danger">DELETE</span></td>
-                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;</code></td>
-                    <td>Delete a deposit</td>
-                  </tr>
-                  <tr>
-                    <td><span class="badge bg-success">POST</span></td>
-                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;/files</code></td>
-                    <td>Upload a file to a deposit</td>
-                  </tr>
-                  <tr>
-                    <td><span class="badge bg-warning">POST</span></td>
-                    <td><code>/fakenodo/deposit/depositions/&lt;id&gt;/actions/publish</code></td>
-                    <td>Publish deposit (assigns fake DOI)</td>
-                  </tr>
-                </tbody>
-              </table>
+<div class="row">
+    
+    <div class="col-lg-7">
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Deposits in Memory ({{ deposits|length }})</h5>
+                <button onclick="window.location.reload()" class="btn btn-sm btn-light"><i data-feather="refresh-cw"></i> Refresh</button>
             </div>
-          </div>
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dep in deposits %}
+                        <tr>
+                            <td><strong>#{{ dep.id }}</strong></td>
+                            <td class="text-truncate" style="max-width: 150px;" title="{{ dep.title }}">{{ dep.title or 'Untitled' }}</td>
+                            <td>
+                                {% if dep.submitted %}
+                                    <span class="badge bg-success">Published</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Draft</span>
+                                {% endif %}
+                            </td>
+                                <td>
+                                  {% if not dep.submitted %}
+                                  <form action="{{ url_for('fakenodo.publish_deposition', deposition_id=dep.id) }}" method="POST" style="display:inline;">
+                                      <button type="submit" class="btn btn-sm btn-primary">
+                                          Publish & Sync
+                                      </button>
+                                  </form>
+                                  {% else %}
+                                  <button class="btn btn-sm btn-secondary" disabled>Published</button>
+                                  {% endif %}
+                                  
+                                  <a href="{{ url_for('fakenodo.get_deposition', deposition_id=dep.id) }}" class="btn btn-sm btn-outline-dark" target="_blank">
+                                      JSON
+                                  </a>
+                              </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">No deposits found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-      </div>
 
-      <div class="col-md-4">
-        <div class="card mb-3">
-          <div class="card-body">
-            <h3 class="h6">Check connection</h3>
-            <p class="small text-muted">Call the mock status endpoint below.</p>
-            <a href="{{ url_for('fakenodo.test_endpoint') }}" class="btn btn-outline-primary w-100">Check Fakenodo</a>
-          </div>
+        <div class="card bg-dark text-white">
+            <div class="card-header py-2">
+                <small class="text-uppercase text-muted">API Response Console</small>
+            </div>
+            <div class="card-body p-2">
+                <pre id="api-response" class="m-0" style="color: #0f0; font-size: 0.85rem; max-height: 200px; overflow-y: auto;">Waiting for actions...</pre>
+            </div>
         </div>
 
+    </div>
+
+    <div class="col-lg-5">
+        
         <div class="card">
-          <div class="card-body">
-            <h3 class="h6">Quick examples</h3>
-            <pre class="small bg-light p-2"><code>curl -X POST -H 'Content-Type: application/json' \
-  -d '{"metadata":{"title":"Test"}}' \
-  {{ request.url_root }}fakenodo/deposit/depositions</code></pre>
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">⚡ Interactive API Tester</h5>
+            </div>
+            <div class="card-body">
+                
+                <h6 class="text-primary fw-bold mb-2">1. Create New Deposit (POST)</h6>
+                <div class="input-group mb-3">
+                    <input type="text" id="new-title" class="form-control" placeholder="Dataset Title" value="Test Dataset">
+                    <button class="btn btn-primary" type="button" onclick="createDeposit()">Create</button>
+                </div>
 
-            <pre class="small bg-light p-2"><code>curl {{ request.url_root }}fakenodo/deposit/depositions</code></pre>
-          </div>
+                <hr>
+
+                <h6 class="text-success fw-bold mb-2">2. Upload File (POST)</h6>
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <input type="number" id="upload-id" class="form-control" placeholder="ID" value="1000">
+                    </div>
+                    <div class="col-8">
+                        <input type="file" id="upload-file" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-success w-100" onclick="uploadFile()">Upload File</button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h6 class="text-danger fw-bold mb-2">3. Delete Deposit (DELETE)</h6>
+                <div class="input-group mb-3">
+                    <input type="number" id="delete-id" class="form-control" placeholder="ID to delete">
+                    <button class="btn btn-danger" type="button" onclick="deleteFromInput()">Delete</button>
+                </div>
+                
+                <hr>
+                
+                <button onclick="checkFakenodo()" class="btn btn-outline-secondary w-100 btn-sm">
+                    Check System Health
+                </button>
+
+            </div>
         </div>
-      </div>
-    </div>
-  </section>
 
-  <section>
-    <div class="card">
-      <div class="card-body">
-        <h2 class="h6">Notes</h2>
-        <ul>
-          <li class="small text-muted">Generated DOIs are mock values and not valid identifiers.</li>
-          <li class="small text-muted">Data is stored in memory only — restarting the app clears all deposits.</li>
-        </ul>
-      </div> </div>
-  </section>
-
-  <section class="mt-4">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="h6">Deposits</h2>
-        {% if deposits %}
-        <div class="table-responsive">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Dataset</th>
-                <th>DOI</th>
-                <th>Published</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for d in deposits %}
-              <tr>
-                <td>{{ d.id }}</td>
-                <td>{{ d.metadata.title if d.metadata and d.metadata.title else (d.metadata.get('title') if d.metadata else '') }}</td>
-                <td>{% if d.dataset_id %}<a href="/dataset/view/{{ d.dataset_id }}">{{ d.dataset_id }}</a>{% else %}-{% endif %}</td>
-                <td>{{ d.doi or '-' }}</td>
-                <td>{% if d.published %}Yes{% else %}No{% endif %}</td>
-                <td>
-                  {% if not d.published %}
-                  <form method="post" action="{{ url_for('fakenodo.publish_deposition', deposition_id=d.id) }}" style="display:inline">
-                    <button type="submit" class="btn btn-sm btn-primary">Publish & Sync</button>
-                  </form>
-                  {% else %}
-                  <button class="btn btn-sm btn-secondary" disabled>Published</button>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <p class="small text-muted">No deposits created yet.</p>
-        {% endif %}
-      </div>
     </div>
-  </section>
 </div>
+
+<script>
+    // --- UTILIDAD: LOG EN PANTALLA ---
+    function logResponse(data) {
+        const consoleEl = document.getElementById('api-response');
+        consoleEl.textContent = JSON.stringify(data, null, 2);
+    }
+
+    // --- ACCIÓN 1: CREAR ---
+    function createDeposit() {
+        const title = document.getElementById('new-title').value;
+        fetch('/fakenodo/deposit/depositions', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ metadata: { title: title } })
+        })
+        .then(res => res.json())
+        .then(data => {
+            logResponse(data);
+            setTimeout(() => window.location.reload(), 1000); // Recarga para ver en tabla
+        })
+        .catch(err => logResponse({error: err.toString()}));
+    }
+
+    // --- ACCIÓN 2: SUBIR ARCHIVO ---
+    function uploadFile() {
+        const id = document.getElementById('upload-id').value;
+        const fileInput = document.getElementById('upload-file');
+        
+        if (!id || fileInput.files.length === 0) {
+            alert("Please provide ID and File");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        // name field is required by Zenodo API, we take filename
+        formData.append('name', fileInput.files[0].name); 
+
+        fetch(`/fakenodo/deposit/depositions/${id}/files`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            logResponse(data);
+            alert("File uploaded!");
+        })
+        .catch(err => logResponse({error: err.toString()}));
+    }
+
+    // --- ACCIÓN 3: BORRAR ---
+    function deleteDeposit(id) {
+        if(!confirm("Delete deposit " + id + "?")) return;
+        
+        fetch(`/fakenodo/deposit/depositions/${id}`, { method: 'DELETE' })
+        .then(res => {
+            if(res.ok) {
+                logResponse({message: "Deleted " + id});
+                window.location.reload();
+            } else {
+                res.json().then(d => logResponse(d));
+            }
+        });
+    }
+
+    function deleteFromInput() {
+        const id = document.getElementById('delete-id').value;
+        if(id) deleteDeposit(id);
+    }
+
+    // --- ACCIÓN 4: CHECK ---
+    function checkFakenodo() {
+        fetch('/fakenodo/test')
+        .then(res => res.json())
+        .then(data => logResponse(data));
+    }
+    
+    // Inicializar Feather Icons
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    });
+</script>
+
 {% endblock %}
