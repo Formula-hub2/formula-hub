@@ -1,0 +1,12 @@
+features
+    Mercedes_Car
+        mandatory
+            PowerUnit
+                mandatory
+                    Silver_Arrows_Performance
+            Chassis
+                mandatory
+                    Carbon_Fiber_Monocoque
+            Safety
+                mandatory
+                    Halo_System
