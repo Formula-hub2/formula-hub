@@ -1,0 +1,4 @@
+features
+	Car
+		mandatory
+			MercedesEngine
