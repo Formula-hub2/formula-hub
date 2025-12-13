@@ -1,170 +1,211 @@
-import hashlib
 import os
-import random
 import shutil
 from datetime import datetime, timezone
 
-from app import db
+from dotenv import load_dotenv
+from flask import current_app
+
 from app.modules.auth.models import User
-from app.modules.dataset.models import Author, DSMetaData, FormulaDataSet, FormulaFile, PublicationType, UVLDataSet
+from app.modules.dataset.models import (
+    Author,
+    DSMetaData,
+    DSMetrics,
+    FormulaDataSet,
+    FormulaFile,
+    PublicationType,
+    UVLDataSet,
+)
 from app.modules.featuremodel.models import FeatureModel, FMMetaData
 from app.modules.hubfile.models import Hubfile
 from core.seeders.BaseSeeder import BaseSeeder
 
 
-def calculate_checksum_and_size(file_path):
-    file_size = os.path.getsize(file_path)
-    with open(file_path, "rb") as file:
-        content = file.read()
-    hash_md5 = hashlib.md5(content, usedforsecurity=False).hexdigest()
-    return hash_md5, file_size
-
-
 class DataSetSeeder(BaseSeeder):
-    priority = 2
+
+    priority = 2  # Lower priority
 
     def run(self):
+        # Retrieve users
         user1 = User.query.filter_by(email="user1@example.com").first()
         user2 = User.query.filter_by(email="user2@example.com").first()
 
         if not user1 or not user2:
-            print("❌ Error: Usuarios no encontrados.")
-            return
+            raise Exception("Users not found. Please seed users first.")
 
-        base_path = os.path.dirname(os.path.abspath(__file__))
-        uvl_examples_dir = os.path.join(base_path, "uvl_examples")
-        formula_examples_dir = os.path.join(base_path, "formula_examples")
+        # Configurar directorios base
+        load_dotenv()
+        working_dir = os.getenv("WORKING_DIR", "")
+        if not working_dir:
+            working_dir = os.path.abspath(os.getcwd())
 
-        files_pack_1 = ["f1_telemetry_spa.csv", "f1_laptimes_monaco.csv"]
-        files_pack_2 = ["f1_weather_silverstone.csv"]
+        # ==============================================================================
+        # PARTE 1: UVL DATASETS
+        # ==============================================================================
 
-        # Verificamos que existen físicamente antes de registrar en BD
-        if all(os.path.exists(os.path.join(formula_examples_dir, f)) for f in files_pack_1 + files_pack_2):
+        # Create DSMetrics instance
+        ds_metrics = DSMetrics(number_of_models="5", number_of_features="50")
+        seeded_ds_metrics = self.seed([ds_metrics])[0]
 
-            # DATASET 1
-            self.create_formula_dataset_entry(
-                user=user2,
-                title="F1 Performance Analysis Pack",
-                desc="Contiene telemetría de Spa y tiempos de vuelta de Mónaco.",
-                filenames=files_pack_1,
-                source_dir=formula_examples_dir,
+        # Create DSMetaData instances
+        ds_meta_data_list = [
+            DSMetaData(
+                deposition_id=1 + i,
+                title=f"Sample dataset {i+1}",
+                description=f"Description for dataset {i+1}",
+                publication_type=PublicationType.DATA_MANAGEMENT_PLAN,
+                publication_doi=f"10.1234/dataset{i+1}",
+                dataset_doi=f"10.1234/dataset{i+1}",
+                tags="tag1, tag2",
+                ds_metrics_id=seeded_ds_metrics.id,
             )
+            for i in range(4)
+        ]
+        seeded_ds_meta_data = self.seed(ds_meta_data_list)
 
-            # DATASET 2
-            self.create_formula_dataset_entry(
-                user=user2,
-                title="F1 Weather Report",
-                desc="Datos meteorológicos del GP de Gran Bretaña.",
-                filenames=files_pack_2,
-                source_dir=formula_examples_dir,
+        # Create Author instances and associate with DSMetaData
+        authors = [
+            Author(
+                name=f"Author {i+1}",
+                affiliation=f"Affiliation {i+1}",
+                orcid=f"0000-0000-0000-000{i}",
+                ds_meta_data_id=seeded_ds_meta_data[i % 4].id,
             )
-        else:
-            print(f"❌ No encuentro tus archivos CSV en {formula_examples_dir}. Asegúrate de que están creados.")
+            for i in range(4)
+        ]
+        self.seed(authors)
 
-        if os.path.exists(uvl_examples_dir):
-            uvl_files = [f for f in os.listdir(uvl_examples_dir) if f.endswith(".uvl")]
-            uvl_files.sort()
-
-            if len(uvl_files) >= 2:
-                for i in range(1, 6):  # 5 Datasets
-                    max_files = min(5, len(uvl_files))
-                    num = random.randint(2, max_files)
-                    selected = random.sample(uvl_files, num)
-
-                    self.create_uvl_dataset(
-                        user1, f"UVL System Pack {i}", "Dataset generado.", selected, uvl_examples_dir
-                    )
-
-    def create_formula_dataset_entry(self, user, title, desc, filenames, source_dir):
-        """
-        Crea SOLO las entradas en la base de datos apuntando a los archivos existentes.
-        NO copia ni renombra archivos físicos.
-        """
-        print(f"   -> Registrando Dataset F1: '{title}'")
-
-        # 1. Metadata
-        ds_meta = DSMetaData(
-            title=title,
-            description=desc,
-            publication_type=PublicationType.DATA_MANAGEMENT_PLAN,
-            tags="f1, csv",
-            deposition_id=None,
-        )
-        author = Author(name=f"{user.profile.name}", affiliation="F1 Team")
-        ds_meta.authors.append(author)
-        db.session.add(ds_meta)
-        db.session.commit()
-
-        # 2. Dataset
-        dataset = FormulaDataSet(
-            user_id=user.id,
-            ds_meta_data_id=ds_meta.id,
-            created_at=datetime.now(timezone.utc),
-            dataset_type="formula_dataset",
-        )
-        db.session.add(dataset)
-        db.session.commit()
-
-        # 3. Archivos (FormulaFile)
-        for fname in filenames:
-            file_path = os.path.join(source_dir, fname)
-
-            # Calculamos tamaño real del archivo existente
-            size = os.path.getsize(file_path)
-
-            # Insertamos en BD apuntando al nombre original
-            f_file = FormulaFile(
-                name=fname,
-                size=size,
-                formula_dataset_id=dataset.id,
+        # Create UVLDataSet instances
+        datasets = [
+            UVLDataSet(
+                user_id=user1.id if i % 2 == 0 else user2.id,
+                ds_meta_data_id=seeded_ds_meta_data[i].id,
+                created_at=datetime.now(timezone.utc),
+                dataset_type="uvl_dataset",
             )
-            db.session.add(f_file)
+            for i in range(4)
+        ]
+        seeded_datasets = self.seed(datasets)
 
-        db.session.commit()
-
-    def create_uvl_dataset(self, user, title, desc, file_names, source_dir):
-        ds_meta = DSMetaData(
-            title=title, description=desc, publication_type=PublicationType.SOFTWARE_DOCUMENTATION, tags="uvl"
-        )
-        author = Author(name=f"{user.profile.name}", affiliation="Home")
-        ds_meta.authors.append(author)
-        db.session.add(ds_meta)
-        db.session.commit()
-
-        dataset = UVLDataSet(
-            user_id=user.id,
-            ds_meta_data_id=ds_meta.id,
-            created_at=datetime.now(timezone.utc),
-            dataset_type="uvl_dataset",
-        )
-        db.session.add(dataset)
-        db.session.commit()
-
-        working_dir = os.getenv("WORKING_DIR", os.getcwd())
-        dest_folder = os.path.join(working_dir, "uploads", f"user_{user.id}", f"dataset_{dataset.id}")
-        os.makedirs(dest_folder, exist_ok=True)
-
-        for fname in file_names:
-            src_path = os.path.join(source_dir, fname)
-            dest_path = os.path.join(dest_folder, fname)
-            shutil.copy2(src_path, dest_path)
-
-            fm_meta = FMMetaData(
-                uvl_filename=fname,
-                title=fname,
-                description="Auto",
+        # Assume there are 12 UVL files, create corresponding FMMetaData and FeatureModel
+        fm_meta_data_list = [
+            FMMetaData(
+                uvl_filename=f"file{i+1}.uvl",
+                title=f"Feature Model {i+1}",
+                description=f"Description for feature model {i+1}",
                 publication_type=PublicationType.SOFTWARE_DOCUMENTATION,
+                publication_doi=f"10.1234/fm{i+1}",
+                tags="tag1, tag2",
                 uvl_version="1.0",
             )
-            db.session.add(fm_meta)
-            db.session.commit()
+            for i in range(12)
+        ]
+        seeded_fm_meta_data = self.seed(fm_meta_data_list)
 
-            fm = FeatureModel(uvl_dataset_id=dataset.id, fm_meta_data_id=fm_meta.id)
-            db.session.add(fm)
-            db.session.commit()
+        # Create Author instances and associate with FMMetaData
+        fm_authors = [
+            Author(
+                name=f"Author {i+5}",
+                affiliation=f"Affiliation {i+5}",
+                orcid=f"0000-0000-0000-000{i+5}",
+                fm_meta_data_id=seeded_fm_meta_data[i].id,
+            )
+            for i in range(12)
+        ]
+        self.seed(fm_authors)
 
-            checksum, size = calculate_checksum_and_size(dest_path)
-            hubfile = Hubfile(name=fname, checksum=checksum, size=size, feature_model_id=fm.id)
-            db.session.add(hubfile)
+        feature_models = [
+            FeatureModel(uvl_dataset_id=seeded_datasets[i // 3].id, fm_meta_data_id=seeded_fm_meta_data[i].id)
+            for i in range(12)
+        ]
+        seeded_feature_models = self.seed(feature_models)
 
-        db.session.commit()
+        # Create files, associate them with FeatureModels and copy files
+        uvl_src_folder = os.path.join(working_dir, "app", "modules", "dataset", "uvl_examples")
+
+        for i in range(12):
+            file_name = f"file{i+1}.uvl"
+            # Verificación de seguridad por si no tienes los archivos creados
+            if not os.path.exists(os.path.join(uvl_src_folder, file_name)):
+                continue
+
+            feature_model = seeded_feature_models[i]
+            dataset = next(ds for ds in seeded_datasets if ds.id == feature_model.uvl_dataset_id)
+            user_id = dataset.user_id
+
+            dest_folder = os.path.join(working_dir, "uploads", f"user_{user_id}", f"dataset_{dataset.id}")
+            os.makedirs(dest_folder, exist_ok=True)
+            shutil.copy(os.path.join(uvl_src_folder, file_name), dest_folder)
+
+            file_path = os.path.join(dest_folder, file_name)
+
+            uvl_file = Hubfile(
+                name=file_name,
+                checksum=f"checksum{i+1}",
+                size=os.path.getsize(file_path),
+                feature_model_id=feature_model.id,
+            )
+            self.seed([uvl_file])
+
+        # ==============================================================================
+        # PARTE 2: FORMULA 1 DATASETS (LÓGICA DE EQUIPOS QUE PEDISTE)
+        # ==============================================================================
+        formula_src_folder = os.path.join(working_dir, "app", "modules", "dataset", "formula_examples")
+
+        # Destino físico para Formula (donde la app busca los CSVs para previsualizar)
+        dest_formula_dir = os.path.join(current_app.root_path, "modules", "dataset", "formula_examples")
+        os.makedirs(dest_formula_dir, exist_ok=True)
+
+        if os.path.exists(formula_src_folder):
+
+            all_formula_files = os.listdir(formula_src_folder)
+            teams = ["Ferrari", "RedBull", "McLaren", "Mercedes", "AstonMartin", "Williams"]
+
+            for index, team_name in enumerate(teams):
+                current_user = user1 if index < 2 else user2  # Alternar usuarios
+
+                # Filtrar CSVs que pertenezcan al equipo (por nombre de archivo)
+                team_csv_files = [f for f in all_formula_files if f.endswith(".csv") and team_name.lower() in f.lower()]
+
+                if team_csv_files:
+                    # 1. Metadatos
+                    ds_meta_data = DSMetaData(
+                        deposition_id=None,
+                        title=f"{team_name} F1 - Telemetry & Strategy",
+                        description=f"Datos oficiales de telemetría y tiempos de {team_name} Racing.",
+                        publication_type=PublicationType.DATA_MANAGEMENT_PLAN,
+                        publication_doi=f"10.formulahub/{team_name.lower()}-data",
+                        dataset_doi=f"10.formulahub/{team_name.lower()}-data",
+                        tags=f"f1, {team_name.lower()}, csv",
+                    )
+                    seeded_ds_meta = self.seed([ds_meta_data])[0]
+
+                    # 2. Autor
+                    ds_author = Author(
+                        name=f"Data Engineer ({team_name})",
+                        affiliation=f"{team_name} F1 Team",
+                        ds_meta_data_id=seeded_ds_meta.id,
+                    )
+                    self.seed([ds_author])
+
+                    # 3. Crear FormulaDataSet
+                    formula_dataset = FormulaDataSet(
+                        user_id=current_user.id,
+                        ds_meta_data_id=seeded_ds_meta.id,
+                        created_at=datetime.now(timezone.utc),
+                        dataset_type="formula_dataset",
+                    )
+                    seeded_dataset = self.seed([formula_dataset])[0]
+
+                    # 4. Crear Archivos (FormulaFile)
+                    for csv_file in team_csv_files:
+                        src_path = os.path.join(formula_src_folder, csv_file)
+                        dest_path = os.path.join(dest_formula_dir, csv_file)
+
+                        # Copiar físico si no existe en destino (para que la app lo encuentre)
+                        if not os.path.exists(dest_path):
+                            shutil.copy(src_path, dest_path)
+
+                        f_file = FormulaFile(
+                            name=csv_file, size=os.path.getsize(dest_path), formula_dataset_id=seeded_dataset.id
+                        )
+                        self.seed([f_file])

@@ -1,0 +1,17 @@
+Circuit,Session,Sector1_TopSpeed,Sector2_TopSpeed,FinishLine_Speed,Wind_Direction
+Monza,FP1,345,330,350,Headwind
+Monza,FP2,348,332,352,Tailwind
+Monza,Quali,351,335,355,Tailwind
+Spa,FP1,330,315,325,Crosswind
+Spa,FP2,332,318,328,Headwind
+Spa,Quali,335,320,330,Tailwind
+Silverstone,FP1,310,290,305,Headwind
+Silverstone,Quali,315,295,310,Crosswind
+LasVegas,FP1,340,325,345,Tailwind
+LasVegas,Quali,345,330,350,Tailwind
+Mexico,FP1,335,310,340,Headwind
+Mexico,Quali,340,315,345,Tailwind
+Baku,FP1,338,320,342,Crosswind
+Baku,Quali,342,325,348,Tailwind
+Jeddah,FP1,325,310,330,Headwind
+Jeddah,Quali,330,315,335,Tailwind

@@ -1,0 +1,16 @@
+Race_ID,Driver,Lap,Stop_Type,Stationary_Time,Lane_Time,Tyre_In,Tyre_Out
+GP_01,Verstappen,12,Regular,2.2,20.1,Soft,Medium
+GP_01,Perez,14,Regular,2.4,20.3,Soft,Hard
+GP_01,Verstappen,35,Regular,2.1,20.0,Medium,Soft
+GP_01,Perez,38,Regular,2.5,20.4,Hard,Soft
+GP_02,Verstappen,10,Regular,2.3,21.5,Medium,Hard
+GP_02,Perez,11,Regular,3.1,22.3,Medium,Hard
+GP_03,Verstappen,15,Regular,2.0,19.8,Soft,Hard
+GP_03,Verstappen,40,Regular,2.2,20.0,Hard,Soft
+GP_04,Perez,8,Wing_Adj,4.5,23.0,Soft,Medium
+GP_04,Verstappen,20,Regular,2.4,20.5,Medium,Hard
+GP_05,Perez,18,Regular,2.6,20.8,Medium,Hard
+GP_05,Verstappen,19,Regular,2.3,20.5,Medium,Hard
+GP_05,Verstappen,45,Regular,2.1,20.3,Hard,Soft
+GP_06,Perez,5,Puncture,3.8,22.0,Soft,Hard
+GP_06,Verstappen,22,Regular,2.2,20.4,Medium,Hard
