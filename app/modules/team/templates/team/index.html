@@ -4,10 +4,51 @@
 
 {% block content %}
 
-    <h1 class="h3 mb-3"><b>Team</b></h1>
+<style>
+        /* Estilos para las tarjetas de miembros */
+        .team-member-card {
+            background-color: #ebe8e8;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-radius: 12px;
+            border: none;
+        }
+
+        .team-member-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15) !important;
+        }
+
+        .wider-card {
+            width: 100% !important; /* 5% más que el 95% anterior */
+            height: 95% !important; /* 5% menos de altura */
+            margin: 0 auto;
+        }
+
+        /* Contenedor de tarjeta más compacto */
+        .team-member-card .card-body {
+            padding: 1rem !important;
+        }
+
+        /* Efecto hover para imágenes */
+        .img-hover-effect {
+            transition: transform 0.3s ease;
+        }
+
+        .team-member-card:hover .img-hover-effect {
+            transform: scale(1.05);
+        }
+
+        /* Estilo para emails */
+        .email-link {
+            color: #3860b6;
+            font-size: 0.9rem;
+        }
+    </style>
+
+    <h1 class="h3 mb-1"><b>Team</b></h1>
 
 
-    <div class="row row-cols-1 row-cols-lg-3 row-cols-md-2 row-cols-12 g-4">
+    <div class="row row-cols-1 row-cols-lg-3 row-cols-md-2 row-cols-12 g-4 mt-n3">
 
         <div class="col">
 
@@ -66,6 +107,114 @@
         </div>
 
     </div>
+
+    <h2 class="h4 mb-4 mt-5 fw-semibold">Project Team Members</h2>
+
+    <div class="row row-cols-2 row-cols-lg-6 row-cols-md-3 row-cols-sm-2 g-3">
+
+        <div class="col d-flex justify-content-center">
+            <div class="card h-100 text-center team-member-card wider-card">
+                <div class="card-body p-3">
+                    <img src="{{ url_for('static', filename='img/team/celia.jpg') }}"
+                        class="rounded-circle mb-3 shadow-sm border border-light border-2 img-hover-effect"
+                        alt="Celia" style="width: 120px; height: 120px; object-fit: cover;">
+                    <h6 class="card-title mb-2 fw-bold">CELIA SUÁREZ</h6>
+                    <div class="mt-3">
+                        <a href="mailto:celsuacor@alum.us.es" class="text-decoration-none email-link">
+                            <i class="bi bi-envelope me-2"></i>celsuacor@alum.us.es
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Miembro 2 -->
+        <div class="col d-flex justify-content-center">
+            <div class="card h-100 text-center team-member-card wider-card">
+                <div class="card-body p-3">
+                    <img src="{{ url_for('static', filename='img/team/jesus.jpg') }}"
+                        class="rounded-circle mb-3 shadow-sm border border-light border-2 img-hover-effect"
+                        alt="Jesús" style="width: 120px; height: 120px; object-fit: cover;">
+                    <h6 class="card-title mb-2 fw-bold">JESÚS GARCÍA</h6>
+                    <div class="mt-3">
+                        <a href="mailto:jesgarper@alum.us.es" class="text-decoration-none email-link">
+                            <i class="bi bi-envelope me-2"></i>jesgarper@alum.us.es
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Miembro 3 -->
+        <div class="col d-flex justify-content-center">
+            <div class="card h-100 text-center team-member-card wider-card">
+                <div class="card-body p-3">
+                    <img src="{{ url_for('static', filename='img/team/carolina.jpg') }}"
+                        class="rounded-circle mb-3 shadow-sm border border-light border-2 img-hover-effect"
+                        alt="Carolina" style="width: 120px; height: 120px; object-fit: cover;">
+                    <h6 class="card-title mb-2 fw-bold">CAROLINA MURILLO</h6>
+                    <div class="mt-3">
+                        <a href="mailto:carmurgom@alum.us.es" class="text-decoration-none email-link">
+                            <i class="bi bi-envelope me-2"></i>carmurgom@alum.us.es
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Miembro 4 -->
+        <div class="col d-flex justify-content-center">
+            <div class="card h-100 text-center team-member-card wider-card">
+                <div class="card-body p-3">
+                    <img src="{{ url_for('static', filename='img/team/francisco.jpg') }}"
+                        class="rounded-circle mb-3 shadow-sm border border-light border-2 img-hover-effect"
+                        alt="Francisco" style="width: 120px; height: 120px; object-fit: cover;">
+                    <h6 class="card-title mb-2 fw-bold">FRANCISCO DE CASTRO</h6>
+                    <div class="mt-3">
+                        <a href="mailto:frademann@alum.us.es" class="text-decoration-none email-link">
+                            <i class="bi bi-envelope me-2"></i>frademann@alum.us.es
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Miembro 5 -->
+        <div class="col d-flex justify-content-center">
+            <div class="card h-100 text-center team-member-card wider-card">
+                <div class="card-body p-3">
+                    <img src="{{ url_for('static', filename='img/team/marta.jpg') }}"
+                        class="rounded-circle mb-3 shadow-sm border border-light border-2 img-hover-effect"
+                        alt="Marta" style="width: 120px; height: 120px; object-fit: cover;">
+                    <h6 class="card-title mb-2 fw-bold">MARTA RECIO</h6>
+                    <div class="mt-3">
+                        <a href="mailto:marrecgil@alum.us.es" class="text-decoration-none email-link">
+                            <i class="bi bi-envelope me-2"></i>marrecgil@alum.us.es
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Miembro 6 -->
+        <div class="col d-flex justify-content-center">
+            <div class="card h-100 text-center team-member-card wider-card">
+                <div class="card-body p-3">
+                    <img src="{{ url_for('static', filename='img/team/angel.jpg') }}"
+                        class="rounded-circle mb-3 shadow-sm border border-light border-2 img-hover-effect"
+                        alt="Ángel" style="width: 120px; height: 120px; object-fit: cover;">
+                    <h6 class="card-title mb-2 fw-bold">ÁNGEL MATEOS</h6>
+                    <div class="mt-3">
+                        <a href="mailto:angmatmar@alum.us.es" class="text-decoration-none email-link">
+                            <i class="bi bi-envelope me-2"></i>angmatmar@alum.us.es
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
 
 {% endblock %}
 
