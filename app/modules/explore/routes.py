@@ -52,7 +52,7 @@ def create_dataset_from_cart():
             current_user=current_user,
             title=title,
             description=description,
-            publication_type=publication_type,  # ← Pasar el publication_type
+            publication_type=publication_type,
             tags=tags,
             source_dataset_ids=source_dataset_ids,
         )
