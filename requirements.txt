@@ -82,9 +82,11 @@ msgspec==0.19.0
 mypy_extensions==1.1.0
 networkx==3.5
 nodeenv==1.9.1
+numpy==2.3.5
 ordered-set==4.1.0
 outcome==1.3.0.post0
 packaging==25.0
+pandas==2.3.3
 pathspec==0.12.1
 pillow==11.3.0
 platformdirs==4.3.8
@@ -118,7 +120,7 @@ qrcode==8.2
 redis==6.2.0
 referencing==0.36.2
 requests==2.32.4
--e git+https://github.com/Formula-hub2/formula-hub.git@767c5c0f9659ce1ed70a2e7baa853cf61820749a#egg=rosemary
+-e git+https://github.com/Formula-hub2/formula-hub.git@123e5720083603b9c5829354f6c048dc99995f79#egg=rosemary
 rpds-py==0.26.0
 rq==2.4.1
 selenium==4.34.2

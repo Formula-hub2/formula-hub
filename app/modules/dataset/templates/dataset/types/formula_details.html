@@ -1,16 +1,84 @@
-<div class="card mb-3">
-    <div class="card-header bg-danger text-white">
-        <h5 class="card-title mb-0 text-white"><i data-feather="activity"></i> Formula 1 Data Preview</h5>
-    </div>
-    <div class="card-body">
-        <p class="text-muted">Mostrando las primeras 10 filas del archivo de telemetría.</p>
-
-        <div class="table-responsive">
-            {{ dataset.get_preview_html() | safe }}
+<div class="list-group mb-3">
+    <div class="list-group-item">
+        <div class="row">
+            <div class="col-12 d-flex justify-content-between align-items-center">
+                <h4 style="margin-bottom: 0px">Formula Models</h4>
+                <h4 style="margin-bottom: 0px;">
+                    <span class="badge bg-dark">{{ dataset.get_files_count() }}</span>
+                </h4>
+            </div>
         </div>
+    </div>
 
-        <div class="mt-3 pt-3 border-top">
-            <strong>File:</strong> {{ dataset.file_name }}
+    {% if dataset.files() %}
+        {% for file in dataset.files() %}
+            <div class="list-group-item">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="row">
+                            <div class="col-8">
+                                <i data-feather="file-text"></i> {{ file.name }}
+                                <br>
+                                <small class="text-muted">({{ file.size | filesizeformat }})</small>
+                            </div>
+                            <div class="col-2">
+                                <div id="check_{{ file.id }}"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 text-end">
+                        <button onclick="viewFormulaFile('{{ file.id }}', '{{ file.name }}')" class="btn btn-outline-secondary btn-sm" style="border-radius: 5px;">
+                            <i data-feather="eye"></i> View
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="list-group-item">
+            <p class="text-muted m-0">No Formula 1 data uploaded yet.</p>
+        </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="formulaFileViewerModal" tabindex="-1" aria-labelledby="formulaFileViewerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" style="height: 80vh; display: flex; align-items: center;">
+        <div class="modal-content" style="height: 80vh;">
+            <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h5 class="modal-title" id="formulaFileViewerModalLabel">CSV Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; height: calc(100vh - 50px);">
+                <div id="formulaFileContent" style="height: 100%; overflow-y: auto; background-color: #fff; padding: 20px;">
+                    <div class="text-center"><div class="spinner-border text-danger" role="status"></div></div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    function viewFormulaFile(fileId, fileName) {
+        var modalEl = document.getElementById('formulaFileViewerModal');
+        var myModal = new bootstrap.Modal(modalEl);
+
+        document.getElementById('formulaFileViewerModalLabel').textContent = fileName;
+        document.getElementById('formulaFileContent').innerHTML = '<div class="text-center mt-5"><div class="spinner-border text-danger" role="status"></div><p class="mt-2">Loading telemetry...</p></div>';
+
+        myModal.show();
+
+        fetch(`/dataset/formula/file_preview/${fileId}`)
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    document.getElementById('formulaFileContent').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                } else {
+                    document.getElementById('formulaFileContent').innerHTML = data.content;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('formulaFileContent').innerHTML = `<div class="alert alert-danger">Connection error.</div>`;
+            });
+    }
+</script>

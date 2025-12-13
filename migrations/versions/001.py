@@ -195,7 +195,7 @@ def upgrade():
         sa.Column(
             "dataset_type",
             sa.String(length=50),
-            nullable=False,
+            nullable=True,
             server_default="uvl_dataset",
         ),
         sa.ForeignKeyConstraint(
@@ -217,7 +217,6 @@ def upgrade():
     op.create_table(
         "formula_dataset",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("file_name", sa.String(length=255), nullable=True),
         sa.ForeignKeyConstraint(
             ["id"],
             ["data_set.id"],
@@ -261,6 +260,18 @@ def upgrade():
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["user.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_table(
+        "formula_file",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("size", sa.Integer(), nullable=True),
+        sa.Column("formula_dataset_id", sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["formula_dataset_id"],
+            ["formula_dataset.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -364,6 +375,7 @@ def downgrade():
     op.drop_table("file_view_record")
     op.drop_table("file_download_record")
     op.drop_table("file")
+    op.drop_table("formula_file")
     op.drop_table("feature_model")
     op.drop_table("ds_view_record")
     op.drop_table("ds_download_record")

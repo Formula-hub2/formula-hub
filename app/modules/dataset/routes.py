@@ -7,13 +7,14 @@ import uuid
 from datetime import datetime, timezone
 from zipfile import ZipFile
 
+import pandas as pd
 from flask import abort, jsonify, make_response, redirect, render_template, request, send_from_directory, url_for
 from flask_login import current_user, login_required
 
 from app import db
 from app.modules.dataset import dataset_bp
 from app.modules.dataset.forms import DataSetForm, FormulaDataSetForm, RawDataSetForm
-from app.modules.dataset.models import DataSet, DSDownloadRecord
+from app.modules.dataset.models import DataSet, DSDownloadRecord, FormulaFile
 from app.modules.dataset.services import (
     AuthorService,
     DataSetService,
@@ -307,3 +308,22 @@ def view_dataset(dataset_id):
     if current_user.is_authenticated and dataset.user_id != current_user.id:
         abort(403)
     return render_template("dataset/view_dataset.html", dataset=dataset)
+
+
+@dataset_bp.route("/dataset/formula/file_preview/<int:file_id>", methods=["GET"])
+def get_formula_file_preview(file_id):
+    file = FormulaFile.query.get_or_404(file_id)
+
+    file_path = file.get_path()
+
+    if not os.path.exists(file_path):
+        return jsonify({"error": "File not found on disk"}), 404
+
+    try:
+        df = pd.read_csv(file_path, nrows=15)
+
+        html_content = df.to_html(classes="table table-striped table-sm table-hover", index=False, border=0)
+        return jsonify({"content": html_content})
+
+    except Exception as e:
+        return jsonify({"error": f"Error reading CSV: {str(e)}"}), 500

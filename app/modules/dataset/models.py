@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 
 import pandas as pd
-from flask import request
+from flask import current_app, request
 from sqlalchemy import Enum as SQLAlchemyEnum
 
 from app import db
@@ -185,42 +185,78 @@ class UVLDataSet(DataSet):
 
 
 # ==========================================
+# Clase Auxiliar -> FormulaFile (Para los CSV) (Lo que sería FeatureModel + Hubfile en UVL)
+# ==========================================
+class FormulaFile(db.Model):
+    __tablename__ = "formula_file"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    size = db.Column(db.Integer, nullable=True)
+    formula_dataset_id = db.Column(db.Integer, db.ForeignKey("formula_dataset.id"), nullable=False)
+
+    def get_path(self):
+        return os.path.join(current_app.root_path, "modules", "dataset", "formula_examples", self.name)
+
+    def to_dict(self):
+        return {"id": self.id, "name": self.name, "size": self.size, "url": f"/dataset/formula/file_preview/{self.id}"}
+
+
+# ==========================================
 # CLASE HIJA: FormulaDataSet
 # ==========================================
 class FormulaDataSet(DataSet):
     __tablename__ = "formula_dataset"
     id = db.Column(db.Integer, db.ForeignKey("data_set.id"), primary_key=True)
 
-    file_name = db.Column(db.String(255), nullable=True)
+    files_rel = db.relationship("FormulaFile", backref="dataset", cascade="all, delete-orphan")
 
     __mapper_args__ = {
         "polymorphic_identity": "formula_dataset",
     }
 
+    def files(self):
+        return self.files_rel
+
+    def get_files_count(self):
+        return len(self.files_rel)
+
+    def get_file_total_size(self):
+        return sum(f.size for f in self.files_rel if f.size)
+
     def get_dashboard_template(self):
         return "dataset/types/formula_details.html"
 
+    def to_dict(self):
+        data = super().to_dict()
+        data.update(
+            {
+                "files": [f.to_dict() for f in self.files_rel],
+                "files_count": self.get_files_count(),
+                "total_size_in_bytes": self.get_file_total_size(),
+                "total_size_in_human_format": self.get_file_total_size_for_human(),
+            }
+        )
+        return data
+
     def get_preview_html(self):
         """
-        Lee el CSV y devuelve una tabla HTML simple.
+        Lee el PRIMER CSV usando PANDAS y devuelve HTML.
         """
-        if not self.file_name:
-            return "<p>No CSV file associated.</p>"
+        if not self.files_rel:  # OJO: Usar self.files_rel
+            return "<p>No CSV files in this dataset.</p>"
 
-        # Lógica rápida para encontrar el archivo
-        # Asumiendo que usas la misma estructura de carpetas: uploads/user_X/dataset_Y/file.csv
-        file_path = os.path.join(
-            os.getenv("WORKING_DIR", ""), "uploads", f"user_{self.user_id}", f"dataset_{self.id}", self.file_name
-        )
+        first_file = self.files_rel[0]
+        file_path = first_file.get_path()
 
-        if os.path.exists(file_path):
-            try:
-                # Usamos pandas para renderizar HTML rápido y limpio
-                df = pd.read_csv(file_path, nrows=10)  # Solo las primeras 10 filas para previsualizar
-                return df.to_html(classes="table table-striped", index=False)
-            except Exception as e:
-                return f"<div class='alert alert-danger'>Error reading CSV: {str(e)}</div>"
-        return "<p>File not found on server.</p>"
+        if not os.path.exists(file_path):
+            return f"<p class='text-danger'>File {first_file.name} not found on disk at {file_path}.</p>"
+
+        try:
+            df = pd.read_csv(file_path, nrows=10)
+            return df.to_html(classes="table table-striped table-sm table-hover", index=False)
+
+        except Exception as e:
+            return f"<div class='alert alert-danger'>Error reading CSV with Pandas: {str(e)}</div>"
 
 
 # ==========================================
