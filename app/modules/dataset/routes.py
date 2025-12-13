@@ -12,7 +12,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.modules.dataset import dataset_bp
-from app.modules.dataset.forms import DataSetForm, RawDataSetForm
+from app.modules.dataset.forms import DataSetForm, FormulaDataSetForm, RawDataSetForm
 from app.modules.dataset.models import DataSet, DSDownloadRecord
 from app.modules.dataset.services import (
     AuthorService,
@@ -21,6 +21,7 @@ from app.modules.dataset.services import (
     DSDownloadRecordService,
     DSMetaDataService,
     DSViewRecordService,
+    FormulaDataSetService,
     RawDataSetService,
     UVLDataSetService,
 )
@@ -52,6 +53,11 @@ def create_dataset(dataset_type):
         form = DataSetForm()
         template = "dataset/upload_dataset.html"
 
+    elif dataset_type == "formula":
+        service = FormulaDataSetService()
+        form = FormulaDataSetForm()
+        template = "dataset/upload_formula.html"
+
     elif dataset_type == "raw":
         service = RawDataSetService()
         form = RawDataSetForm()
@@ -74,7 +80,7 @@ def create_dataset(dataset_type):
 
             logger.info(f"Created dataset: {dataset}")
 
-            # Lógica específica de movimiento de ficheros (Solo para UVL por ahora)
+            # Lógica específica de movimiento de ficheros (Solo para UVL)
             if dataset_type == "uvl":
                 service.move_feature_models(dataset)
 
@@ -103,8 +109,6 @@ def create_dataset(dataset_type):
 
             try:
                 # Subida de ficheros a Zenodo
-                # Si es UVL, subimos los feature models.
-                # Si es Raw, en el futuro habrá que implementar su lógica de subida de ficheros.
                 if hasattr(dataset, "feature_models"):
                     for feature_model in dataset.feature_models:
                         zenodo_service.upload_file(dataset, deposition_id, feature_model)
@@ -119,10 +123,11 @@ def create_dataset(dataset_type):
                 msg = f"it has not been possible upload feature models in Zenodo and update the DOI: {e}"
                 return jsonify({"message": msg}), 200
 
-        # Delete temp folder (Limpieza)
-        file_path = current_user.temp_folder()
-        if os.path.exists(file_path) and os.path.isdir(file_path):
-            shutil.rmtree(file_path)
+        # Delete temp folder (Limpieza temporal para UVL)
+        if dataset_type == "uvl":
+            file_path = current_user.temp_folder()
+            if os.path.exists(file_path) and os.path.isdir(file_path):
+                shutil.rmtree(file_path)
 
         msg = "Everything works!"
         return jsonify({"message": msg}), 200
@@ -216,8 +221,6 @@ def download_dataset(dataset_id):
     zip_path = os.path.join(temp_dir, f"dataset_{dataset_id}.zip")
 
     # Generación de ZIP
-    # Nota: Si es un RawDataSet y no tiene ficheros aún, esto generará un zip vacío o fallará si la carpeta no existe.
-    # Se recomienda asegurar que la carpeta exista.
     if not os.path.exists(file_path):
         os.makedirs(file_path, exist_ok=True)
 

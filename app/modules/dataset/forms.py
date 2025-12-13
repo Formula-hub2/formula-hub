@@ -1,4 +1,5 @@
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField, FileRequired
 from wtforms import FieldList, FormField, SelectField, StringField, SubmitField, TextAreaField
 from wtforms.validators import URL, DataRequired, Optional
 
@@ -96,6 +97,38 @@ class DataSetForm(FlaskForm):
         return [fm.get_feature_model() for fm in self.feature_models]
 
 
+class FormulaDataSetForm(FlaskForm):
+    title = StringField("Title", validators=[DataRequired()])
+    desc = TextAreaField("Description", validators=[DataRequired()])
+    publication_type = SelectField(
+        "Publication type",
+        choices=[(pt.value, pt.name.replace("_", " ").title()) for pt in PublicationType],
+        validators=[DataRequired()],
+    )
+    publication_doi = StringField("Publication DOI", validators=[Optional(), URL()])
+    tags = StringField("Tags (separated by commas)")
+
+    # Campo específico para subir el CSV
+    csv_file = FileField("Formula 1 Data (.csv)", validators=[FileRequired(), FileAllowed(["csv"], "CSV files only!")])
+
+    submit = SubmitField("Upload Formula Data")
+
+    def get_dsmetadata(self):
+        publication_type_converted = "NONE"
+        for pt in PublicationType:
+            if pt.value == self.publication_type.data:
+                publication_type_converted = pt.name
+                break
+
+        return {
+            "title": self.title.data,
+            "description": self.desc.data,
+            "publication_type": publication_type_converted,
+            "publication_doi": self.publication_doi.data,
+            "tags": self.tags.data,
+        }
+
+
 class RawDataSetForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired()])
     desc = TextAreaField("Description", validators=[DataRequired()])
@@ -108,11 +141,9 @@ class RawDataSetForm(FlaskForm):
     dataset_doi = StringField("Dataset DOI", validators=[Optional(), URL()])
     tags = StringField("Tags (separated by commas)")
 
-    # Simplificación: Solo botón de envío, sin lista dinámica de autores compleja por ahora
     submit = SubmitField("Create Generic Dataset")
 
     def get_dsmetadata(self):
-        # Reutilizamos lógica de conversión
         publication_type_converted = "NONE"
         for pt in PublicationType:
             if pt.value == self.publication_type.data:

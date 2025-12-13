@@ -62,8 +62,22 @@
                     <p class="card-text">
                         You have not created any dataset synchronized with Zenodo, are you up for it?
                     </p>
-                    <a href="{{ url_for('dataset.create_dataset') }}" class="btn btn-primary">
-                        Upload dataset</a>
+                    <div class="btn-group">
+                        <a href="{{ url_for('dataset.create_dataset', dataset_type='uvl') }}" class="btn btn-primary">
+                            <i data-feather="upload"></i> Upload UVL
+                        </a>
+                        <button type="button" class="btn btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="visually-hidden">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('dataset.create_dataset', dataset_type='formula') }}">
+                                <i data-feather="activity" class="text-danger"></i> Formula 1 (CSV)
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('dataset.create_dataset', dataset_type='raw') }}">
+                                <i data-feather="file"></i> Generic / Raw
+                            </a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>

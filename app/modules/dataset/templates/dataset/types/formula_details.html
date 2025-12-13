@@ -1,0 +1,16 @@
+<div class="card mb-3">
+    <div class="card-header bg-danger text-white">
+        <h5 class="card-title mb-0 text-white"><i data-feather="activity"></i> Formula 1 Data Preview</h5>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Mostrando las primeras 10 filas del archivo de telemetría.</p>
+
+        <div class="table-responsive">
+            {{ dataset.get_preview_html() | safe }}
+        </div>
+
+        <div class="mt-3 pt-3 border-top">
+            <strong>File:</strong> {{ dataset.file_name }}
+        </div>
+    </div>
+</div>

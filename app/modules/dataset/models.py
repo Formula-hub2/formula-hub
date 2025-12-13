@@ -1,6 +1,8 @@
+import os
 from datetime import datetime
 from enum import Enum
 
+import pandas as pd
 from flask import request
 from sqlalchemy import Enum as SQLAlchemyEnum
 
@@ -65,7 +67,7 @@ class DSMetaData(db.Model):
 
 
 # ==========================================
-# CLASE PADRE: DataSet (Genérico)
+# CLASE PADRE: DataSet
 # ==========================================
 class DataSet(db.Model):
     __tablename__ = "data_set"
@@ -77,7 +79,7 @@ class DataSet(db.Model):
     download_count = db.Column(db.Integer, nullable=False, default=0, server_default="0")
 
     # --- POLIMORFISMO ---
-    dataset_type = db.Column(db.String(50))  # Esta columna decide si es UVL, Imagen, etc.
+    dataset_type = db.Column(db.String(50))
 
     __mapper_args__ = {"polymorphic_identity": "generic_dataset", "polymorphic_on": dataset_type}
 
@@ -144,15 +146,13 @@ class DataSet(db.Model):
 
 
 # ==========================================
-# CLASE HIJA: UVLDataSet (Específico)
+# CLASE HIJA: UVLDataSet
 # ==========================================
 class UVLDataSet(DataSet):
     __tablename__ = "uvl_dataset"
 
-    # Clave foránea a la tabla padre
     id = db.Column(db.Integer, db.ForeignKey("data_set.id"), primary_key=True)
 
-    # Relación específica que SOLO tienen los UVL
     feature_models = db.relationship("FeatureModel", backref="uvl_dataset", lazy=True, cascade="all, delete")
 
     __mapper_args__ = {
@@ -184,6 +184,48 @@ class UVLDataSet(DataSet):
         return data
 
 
+# ==========================================
+# CLASE HIJA: FormulaDataSet
+# ==========================================
+class FormulaDataSet(DataSet):
+    __tablename__ = "formula_dataset"
+    id = db.Column(db.Integer, db.ForeignKey("data_set.id"), primary_key=True)
+
+    file_name = db.Column(db.String(255), nullable=True)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "formula_dataset",
+    }
+
+    def get_dashboard_template(self):
+        return "dataset/types/formula_details.html"
+
+    def get_preview_html(self):
+        """
+        Lee el CSV y devuelve una tabla HTML simple.
+        """
+        if not self.file_name:
+            return "<p>No CSV file associated.</p>"
+
+        # Lógica rápida para encontrar el archivo
+        # Asumiendo que usas la misma estructura de carpetas: uploads/user_X/dataset_Y/file.csv
+        file_path = os.path.join(
+            os.getenv("WORKING_DIR", ""), "uploads", f"user_{self.user_id}", f"dataset_{self.id}", self.file_name
+        )
+
+        if os.path.exists(file_path):
+            try:
+                # Usamos pandas para renderizar HTML rápido y limpio
+                df = pd.read_csv(file_path, nrows=10)  # Solo las primeras 10 filas para previsualizar
+                return df.to_html(classes="table table-striped", index=False)
+            except Exception as e:
+                return f"<div class='alert alert-danger'>Error reading CSV: {str(e)}</div>"
+        return "<p>File not found on server.</p>"
+
+
+# ==========================================
+# CLASE HIJA: RawDataSet
+# ==========================================
 class RawDataSet(DataSet):
     __tablename__ = "raw_dataset"
     id = db.Column(db.Integer, db.ForeignKey("data_set.id"), primary_key=True)

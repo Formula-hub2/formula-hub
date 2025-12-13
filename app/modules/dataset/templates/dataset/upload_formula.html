@@ -1,0 +1,65 @@
+{% extends "base_template.html" %}
+
+{% block title %}Upload Formula 1 Dataset{% endblock %}
+
+{% block content %}
+    <h1 class="h2 mb-3"><b>Upload</b> Formula 1 Data</h1>
+
+    <div class="row">
+        <div class="col-xl-8 col-lg-12">
+
+            {% if form.errors %}
+                <div class="alert alert-danger">
+                    <ul>
+                    {% for field, errors in form.errors.items() %}
+                        {% for error in errors %}
+                            <li>{{ field }}: {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('dataset.create_dataset', dataset_type='formula') }}" enctype="multipart/form-data">
+                {{ form.hidden_tag() }}
+
+                <div class="mb-3">
+                    {{ form.title.label(class="form-label") }}
+                    {{ form.title(class="form-control") }}
+                </div>
+
+                <div class="mb-3">
+                    {{ form.desc.label(class="form-label") }}
+                    {{ form.desc(class="form-control", rows=3) }}
+                </div>
+
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        {{ form.publication_type.label(class="form-label") }}
+                        {{ form.publication_type(class="form-control") }}
+                    </div>
+                    <div class="col-6 mb-3">
+                        {{ form.tags.label(class="form-label") }}
+                        {{ form.tags(class="form-control") }}
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Formula 1 Data Source</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="csv_file"><strong>Upload CSV File</strong></label>
+                            {{ form.csv_file(class="form-control") }}
+                            <div class="form-text">Please upload a valid .csv file containing Formula 1 telemetry or stats.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg">Create Formula Dataset</button>
+                <a href="{{ url_for('dataset.list_dataset') }}" class="btn btn-secondary btn-lg">Cancel</a>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -215,6 +215,16 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_table(
+        "formula_dataset",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("file_name", sa.String(length=255), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["id"],
+            ["data_set.id"],
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_table(
         "raw_dataset",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(["id"], ["data_set.id"], ondelete="CASCADE"),
@@ -358,6 +368,7 @@ def downgrade():
     op.drop_table("ds_view_record")
     op.drop_table("ds_download_record")
     op.drop_table("raw_dataset")  # IMPORTANTE: Borrar hijo antes que padre
+    op.drop_table("formula_dataset")  # IMPORTANTE: Borrar hijo antes que padre
     op.drop_table("uvl_dataset")  # IMPORTANTE: Borrar hijo antes que padre
     op.drop_table("data_set")
     op.drop_table("author")

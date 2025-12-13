@@ -155,7 +155,7 @@ class DataSetSeeder(BaseSeeder):
                     is_specific_for_me = f_lower.startswith(current_base_name)
 
                     # B. ¿Es genérico del equipo? (Empieza por equipo... Y NO es específico de otro modelo)
-                    #    Ej: "redbull.jpg" empieza por "redbull", y NO empieza por "redbull_rb20" (nombre de otro modelo)
+                    #   Ej: "redbull.jpg" empieza por "redbull", y NO empieza por "redbull_rb20" (nombre de otro modelo)
                     is_generic_team_file = f_lower.startswith(team_name.lower()) and not any(
                         f_lower.startswith(other_base) for other_base in other_models_bases
                     )

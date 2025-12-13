@@ -6,9 +6,18 @@ import uuid
 from typing import Optional
 
 from flask import request
+from werkzeug.utils import secure_filename
 
 from app.modules.auth.services import AuthenticationService
-from app.modules.dataset.models import DataSet, DSMetaData, DSViewRecord, PublicationType, RawDataSet, UVLDataSet
+from app.modules.dataset.models import (
+    DataSet,
+    DSMetaData,
+    DSViewRecord,
+    FormulaDataSet,
+    PublicationType,
+    RawDataSet,
+    UVLDataSet,
+)
 from app.modules.dataset.repositories import (
     AuthorRepository,
     DataSetRepository,
@@ -245,6 +254,54 @@ class UVLDataSetService(DataSetService):
         return dataset
 
 
+# === SERVICIO ESPECÍFICO FORMULA ===
+class FormulaDataSetService(DataSetService):
+    def __init__(self):
+        super().__init__()
+        self.repository = BaseRepository(FormulaDataSet)
+
+    def create_from_form(self, form, current_user) -> FormulaDataSet:
+        # 1. Crear Metadatos
+        dsmetadata = self.dsmetadata_repository.create(**form.get_dsmetadata())
+
+        # 2. Autor por defecto
+        author = self.author_repository.create(
+            commit=False,
+            ds_meta_data_id=dsmetadata.id,
+            name=f"{current_user.profile.surname}, {current_user.profile.name}",
+            affiliation=current_user.profile.affiliation,
+            orcid=current_user.profile.orcid,
+        )
+        dsmetadata.authors.append(author)
+
+        # 3. Preparar archivo
+        file = form.csv_file.data
+        filename = secure_filename(file.filename)
+
+        # 4. Crear Dataset en BD (commit=True para obtener ID)
+        dataset = self.create(
+            commit=True,
+            user_id=current_user.id,
+            ds_meta_data_id=dsmetadata.id,
+            file_name=filename,  # Columna específica de FormulaDataSet
+        )
+
+        # 5. Guardar archivo físico
+        working_dir = os.getenv("WORKING_DIR", "")
+        dest_folder = os.path.join(working_dir, "uploads", f"user_{current_user.id}", f"dataset_{dataset.id}")
+        os.makedirs(dest_folder, exist_ok=True)
+
+        file_path = os.path.join(dest_folder, filename)
+        file.save(file_path)
+
+        return dataset
+
+    # Para cumplir con la interfaz, aunque no mueve nada extra
+    def move_feature_models(self, dataset):
+        pass
+
+
+# === SERVICIO GENÉRICO (RAW) ===
 class RawDataSetService(DataSetService):
     def __init__(self):
         super().__init__()
@@ -272,7 +329,6 @@ class RawDataSetService(DataSetService):
         pass  # No hace nada en Raw
 
 
-# --- Otros servicios sin cambios ---
 class AuthorService(BaseService):
     def __init__(self):
         super().__init__(AuthorRepository())
