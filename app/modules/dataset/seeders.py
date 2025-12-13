@@ -1,11 +1,9 @@
 import os
-import re
 import shutil
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
-from app import db
 from app.modules.auth.models import User
 from app.modules.dataset.models import Author, DSMetaData, DSMetrics, PublicationType, UVLDataSet
 from app.modules.featuremodel.models import FeatureModel, FMMetaData
@@ -19,16 +17,13 @@ class DataSetSeeder(BaseSeeder):
     def run(self):
         # 1. Recuperar Usuarios
         user1 = User.query.filter_by(email="user1@example.com").first()
-        # user2 = User.query.filter_by(email="user2@example.com").first()
+        user2 = User.query.filter_by(email="user2@example.com").first()
 
-        # Si no existen usuarios, creamos user1 de emergencia para que no falle
-        if not user1:
-            print("Warning: user1 no encontrado. Creando usuario dummy...")
-            user1 = User(email="user1@example.com", password="password", created_at=datetime.now(timezone.utc))
-            db.session.add(user1)
-            db.session.commit()
+        if not user1 or not user2:
+            print("Error: user1 o user2 no encontrados. Ejecuta primero el seeder de usuarios.")
+            return
 
-        # 2. Preparar carpetas
+        # 2. Configurar directorios
         base_path = os.path.dirname(os.path.abspath(__file__))
         src_folder = os.path.join(base_path, "uvl_examples")
 
@@ -36,102 +31,151 @@ class DataSetSeeder(BaseSeeder):
             print(f"Error: La carpeta {src_folder} no existe.")
             return
 
-        # Escaneo dinámico (SIN nombres fijos)
-        # Excluye los archivos de ejemplo (file1.uvl, ..., file12.uvl)
-        files_in_dir = os.listdir(src_folder)
-        uvl_files = [f for f in files_in_dir if f.endswith(".uvl") and not re.match(r"^file\d+\.uvl$", f)]
-
-        # Impide crear un dataset sin archivos .uvl (PODRIA MODIFICARSE)
-        if not uvl_files:
-            print(f"No hay archivos .uvl en la carpeta {src_folder}.")
-            return
-
-        # 3. Crear Dataset Contenedor
-        ds_metrics = DSMetrics(number_of_models=str(len(uvl_files)), number_of_features="N/A")
-        seeded_ds_metrics = self.seed([ds_metrics])[0]
-
-        ds_meta_data = DSMetaData(
-            deposition_id=1,
-            title="Formula 1 2024 - Official Data",
-            description="Dataset técnico con especificaciones (.pdf), telemetría (.csv) y modelos (.uvl).",
-            publication_type=PublicationType.DATA_MANAGEMENT_PLAN,
-            publication_doi="10.formulahub/f1-multi",
-            dataset_doi="10.formulahub/f1-multi",
-            tags="f1, telemetry, specs",
-            ds_metrics_id=seeded_ds_metrics.id,
-        )
-        seeded_ds_meta = self.seed([ds_meta_data])[0]
-
-        ds_author = Author(
-            name="FIA Technical Delegate",
-            affiliation="Federation Internationale de l'Automobile",
-            orcid="0000-0001-FIA-TECH",
-            ds_meta_data_id=seeded_ds_meta.id,
-        )
-        self.seed([ds_author])
-
-        f1_dataset = UVLDataSet(
-            user_id=user1.id,
-            ds_meta_data_id=seeded_ds_meta.id,
-            created_at=datetime.now(timezone.utc),
-        )
-        seeded_dataset = self.seed([f1_dataset])[0]
-
-        # 4. Procesar archivos
         load_dotenv()
         working_dir = os.getenv("WORKING_DIR", "")
         if not working_dir:
             working_dir = os.path.abspath(os.getcwd())
 
-        dest_folder = os.path.join(working_dir, "uploads", f"user_{user1.id}", f"dataset_{seeded_dataset.id}")
+        # Listar todos los archivos una vez
+        all_files_in_dir = os.listdir(src_folder)
 
-        if os.path.exists(dest_folder):
-            shutil.rmtree(dest_folder)
-        os.makedirs(dest_folder, exist_ok=True)
+        # 3. Definir los equipos
+        teams = ["ferrari", "RedBull", "McLaren", "Mercedes"]
 
-        for i, uvl_filename in enumerate(uvl_files):
-            clean_title = uvl_filename.replace(".uvl", "").replace("_", " ").title()
+        # 4. Bucle por cada equipo
+        for index, team_name in enumerate(teams):
 
-            fm_meta = FMMetaData(
-                uvl_filename=uvl_filename,
-                title=clean_title,
-                description=f"Paquete técnico completo para {clean_title}",
-                publication_type=PublicationType.SOFTWARE_DOCUMENTATION,
-                publication_doi=f"10.formulahub/model-{i}",
-                tags="chassis, aero, data",
-                uvl_version="1.0",
+            # --- PREPARACIÓN DEL EQUIPO ---
+            current_user = user1 if index < 2 else user2
+
+            # Identificar los archivos .uvl de este equipo
+            team_uvl_files = [
+                f for f in all_files_in_dir if f.endswith(".uvl") and f.lower().startswith(team_name.lower())
+            ]
+
+            if not team_uvl_files:
+                print(f"   [SKIP] No hay .uvl para '{team_name}'")
+                continue
+
+            # --- REGISTRO DE ARCHIVOS YA ASIGNADOS EN ESTE DATASET ---
+            # Esto evita que redbull.jpg se suba 2 veces en el mismo dataset
+            assigned_files_in_dataset = set()
+
+            # --- Crear Dataset Contenedor ---
+            ds_metrics = DSMetrics(number_of_models=str(len(team_uvl_files)), number_of_features="N/A")
+            seeded_ds_metrics = self.seed([ds_metrics])[0]
+
+            ds_meta_data = DSMetaData(
+                deposition_id=1 + index,
+                title=f"{team_name} F1 Team - Official Data",
+                description=f"Datos oficiales de {team_name} incluyendo modelos y documentación técnica.",
+                publication_type=PublicationType.DATA_MANAGEMENT_PLAN,
+                publication_doi=f"10.formulahub/{team_name.lower().replace(' ', '-')}",
+                dataset_doi=f"10.formulahub/{team_name.lower().replace(' ', '-')}",
+                tags=f"f1, {team_name.lower()}",
+                ds_metrics_id=seeded_ds_metrics.id,
             )
-            seeded_meta = self.seed([fm_meta])[0]
+            seeded_ds_meta = self.seed([ds_meta_data])[0]
 
-            author = Author(
-                name="Team Engineer",
-                affiliation="F1 Team",
-                orcid=f"0000-0000-0000-000{i}",
-                fm_meta_data_id=seeded_meta.id,
+            ds_author = Author(
+                name=f"Head of Aero ({team_name})",
+                affiliation=f"{team_name} Racing",
+                orcid=f"0000-0001-{team_name.upper().replace(' ', '')[:4]}",
+                ds_meta_data_id=seeded_ds_meta.id,
             )
-            self.seed([author])
+            self.seed([ds_author])
 
-            fm = FeatureModel(uvl_dataset_id=seeded_dataset.id, fm_meta_data_id=seeded_meta.id)
-            seeded_fm = self.seed([fm])[0]
+            uvl_dataset = UVLDataSet(
+                user_id=current_user.id,
+                ds_meta_data_id=seeded_ds_meta.id,
+                created_at=datetime.now(timezone.utc),
+            )
+            seeded_dataset = self.seed([uvl_dataset])[0]
 
-            # Copiar archivos
-            base_name = os.path.splitext(uvl_filename)[0]
-            all_files = os.listdir(src_folder)
-            related_files = [f for f in all_files if f.startswith(base_name)]
+            # Carpeta física destino (única por dataset)
+            dest_folder = os.path.join(
+                working_dir, "uploads", f"user_{current_user.id}", f"dataset_{seeded_dataset.id}"
+            )
+            if os.path.exists(dest_folder):
+                shutil.rmtree(dest_folder)
+            os.makedirs(dest_folder, exist_ok=True)
 
-            for file_name in related_files:
-                src_path = os.path.join(src_folder, file_name)
-                dest_path = os.path.join(dest_folder, file_name)
+            # --- Procesar cada modelo UVL ---
+            for i, uvl_filename in enumerate(team_uvl_files):
+                clean_title = uvl_filename.replace(".uvl", "").replace("_", " ").title()
 
-                try:
-                    shutil.copy(src_path, dest_path)
-                    hubfile = Hubfile(
-                        name=file_name,
-                        checksum=f"hash_{file_name}",
-                        size=os.path.getsize(dest_path),
-                        feature_model_id=seeded_fm.id,
+                fm_meta = FMMetaData(
+                    uvl_filename=uvl_filename,
+                    title=clean_title,
+                    description=f"Modelo {clean_title}",
+                    publication_type=PublicationType.SOFTWARE_DOCUMENTATION,
+                    publication_doi=f"10.formulahub/{team_name.lower()}-{i}",
+                    tags="uvl, model",
+                    uvl_version="1.0",
+                )
+                seeded_meta = self.seed([fm_meta])[0]
+
+                fm_author = Author(
+                    name=f"Engineer {i+1}",
+                    affiliation=f"{team_name} Team",
+                    orcid=f"0000-0000-0000-000{i}",
+                    fm_meta_data_id=seeded_meta.id,
+                )
+                self.seed([fm_author])
+
+                fm = FeatureModel(uvl_dataset_id=seeded_dataset.id, fm_meta_data_id=seeded_meta.id)
+                seeded_fm = self.seed([fm])[0]
+
+                # --- LÓGICA DE ASIGNACIÓN DE ARCHIVOS (SIN DUPLICADOS) ---
+                current_base_name = os.path.splitext(uvl_filename)[0].lower()
+
+                # Nombres base de los OTROS modelos de este equipo (para no robar sus archivos específicos)
+                other_models_bases = [os.path.splitext(f)[0].lower() for f in team_uvl_files if f != uvl_filename]
+
+                files_to_copy = []
+
+                for f in all_files_in_dir:
+                    f_lower = f.lower()
+
+                    # 1. Si es el propio UVL actual -> SÍ
+                    if f == uvl_filename:
+                        files_to_copy.append(f)
+                        continue
+
+                    # 2. Si es otro .uvl -> NO (cada mochuelo a su olivo)
+                    if f.endswith(".uvl"):
+                        continue
+
+                    # 3. Si ya ha sido asignado en este dataset -> NO (evitar duplicados entre modelos)
+                    if f in assigned_files_in_dataset:
+                        continue
+
+                    # 4. Comprobación Inteligente:
+                    # A. ¿Es específico para MÍ? (Empieza por mi nombre base)
+                    is_specific_for_me = f_lower.startswith(current_base_name)
+
+                    # B. ¿Es genérico del equipo? (Empieza por equipo... Y NO es específico de otro modelo)
+                    #    Ej: "redbull.jpg" empieza por "redbull", y NO empieza por "redbull_rb20" (nombre de otro modelo)
+                    is_generic_team_file = f_lower.startswith(team_name.lower()) and not any(
+                        f_lower.startswith(other_base) for other_base in other_models_bases
                     )
-                    self.seed([hubfile])
-                except Exception as e:
-                    print(f"Error copiando {file_name}: {e}")
-                    continue
+
+                    if is_specific_for_me or is_generic_team_file:
+                        files_to_copy.append(f)
+                        assigned_files_in_dataset.add(f)  # Lo marcamos para que el siguiente modelo no lo coja
+
+                for file_name in files_to_copy:
+                    src_path = os.path.join(src_folder, file_name)
+                    dest_path = os.path.join(dest_folder, file_name)
+
+                    try:
+                        shutil.copy(src_path, dest_path)
+                        hubfile = Hubfile(
+                            name=file_name,
+                            checksum=f"hash_{file_name}_{datetime.now().timestamp()}",
+                            size=os.path.getsize(dest_path),
+                            feature_model_id=seeded_fm.id,
+                        )
+                        self.seed([hubfile])
+                    except Exception as e:
+                        print(f"      [ERROR] Copiando {file_name}: {e}")

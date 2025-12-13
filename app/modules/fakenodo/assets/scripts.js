@@ -5,14 +5,14 @@ function test_fakenodo_connection() {
     // Endpoint para comprobar estado
     xhr.open('GET', '/fakenodo/test', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    
+
     xhr.onreadystatechange = function () {
         if (xhr.readyState === 4) {
             if (xhr.status === 200) {
                 try {
                     var response = JSON.parse(xhr.responseText);
                     console.log("Fakenodo Status:", response.message);
-                    
+
                     if (!response.success) {
                         show_fakenodo_error();
                     }
@@ -37,7 +37,7 @@ function show_fakenodo_error() {
 }
 
 // === TRUCO DE COMPATIBILIDAD ===
-// Creamos un alias: si alguien llama a 'test_zenodo_connection', 
+// Creamos un alias: si alguien llama a 'test_zenodo_connection',
 // ejecutamos nuestra función de Fakenodo.
 window.test_zenodo_connection = test_fakenodo_connection;
 // ===============================
