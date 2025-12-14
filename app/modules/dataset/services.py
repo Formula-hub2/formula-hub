@@ -14,6 +14,7 @@ from app.modules.dataset.models import (
     DSMetaData,
     DSViewRecord,
     FormulaDataSet,
+    FormulaFile,
     PublicationType,
     RawDataSet,
     UVLDataSet,
@@ -104,40 +105,51 @@ class DataSetService(BaseService):
 
     def create_combined_dataset(self, current_user, title, description, publication_type, tags, source_dataset_ids):
         """
-        Crea un nuevo dataset combinando modelos de datasets existentes (carrito).
+        Crea un nuevo dataset combinando modelos/archivos de datasets existentes.
+        Determina automáticamente el tipo de dataset resultante basándose en los inputs.
         """
 
-        # 1. Convertir publication_type (string) a Enum
+        # 1. Recuperar todos los datasets fuente
+        source_datasets = [self.get_or_404(id) for id in source_dataset_ids]
+
+        # 2. Determinar el tipo de dataset resultante
+        is_all_uvl = all(ds.dataset_type == "uvl_dataset" for ds in source_datasets)
+        is_all_formula = all(ds.dataset_type == "formula_dataset" for ds in source_datasets)
+
+        # 3. Preparar Metadatos comunes
         try:
             pub_type_enum = PublicationType(publication_type)
         except ValueError:
             pub_type_enum = PublicationType.NONE
 
-        # 2. Crear metadatos del Dataset
         ds_meta = self.dsmetadata_repository.create(
             title=title, description=description, publication_type=pub_type_enum, tags=tags
         )
 
-        # 3. Crear el Dataset (UVLDataSet para soportar feature models)
-        # Usamos create con commit=True para obtener el ID necesario para las carpetas
-        dataset = UVLDataSet(user_id=current_user.id, ds_meta_data_id=ds_meta.id)
+        # 4. Instanciar el Dataset correcto
+        if is_all_uvl:
+            dataset = UVLDataSet(user_id=current_user.id, ds_meta_data_id=ds_meta.id)
+        elif is_all_formula:
+            dataset = FormulaDataSet(user_id=current_user.id, ds_meta_data_id=ds_meta.id)
+        else:
+            # Si hay mezcla (UVL + Formula), lo degradamos a RAW (Genérico)
+            dataset = RawDataSet(user_id=current_user.id, ds_meta_data_id=ds_meta.id)
+
         self.repository.session.add(dataset)
         self.repository.session.commit()
 
-        # 4. Preparar directorios
+        # 5. Preparar carpetas
         working_dir = os.getenv("WORKING_DIR", "")
         dest_folder = os.path.join(working_dir, "uploads", f"user_{current_user.id}", f"dataset_{dataset.id}")
         os.makedirs(dest_folder, exist_ok=True)
 
-        # 5. Iterar datasets fuente y clonar modelos
-        for source_id in source_dataset_ids:
-            source_ds = self.get_or_404(source_id)
+        # 6. LÓGICA DE COPIA SEGÚN TIPO
+        for source_ds in source_datasets:
 
-            # Solo procesamos si tiene modelos (es UVLDataSet)
-            if hasattr(source_ds, "feature_models"):
+            # --- CASO A: UVL ---
+            if is_all_uvl and hasattr(source_ds, "feature_models"):
                 for original_fm in source_ds.feature_models:
-
-                    # A. Clonar FMMetaData
+                    # Clonar FMMetaData
                     original_meta = original_fm.fm_meta_data
                     new_fm_meta = FMMetaData(
                         uvl_filename=original_meta.uvl_filename,
@@ -151,50 +163,98 @@ class DataSetService(BaseService):
                     self.repository.session.add(new_fm_meta)
                     self.repository.session.commit()
 
-                    # B. Crear nuevo FeatureModel enlazado al nuevo Dataset
+                    # Crear FeatureModel
                     new_fm = FeatureModel(uvl_dataset_id=dataset.id, fm_meta_data_id=new_fm_meta.id)
                     self.repository.session.add(new_fm)
                     self.repository.session.commit()
 
-                    # C. Clonar Archivos Físicos y crear registro Hubfile
+                    # Copiar Archivos (Hubfile)
                     for original_file in original_fm.files:
-                        # Rutas
-                        source_path = os.path.join(
+                        self._copy_file_physical_and_db(
+                            original_file,
+                            source_ds,
+                            dataset,
+                            dest_folder,
                             working_dir,
-                            "uploads",
-                            f"user_{source_ds.user_id}",
-                            f"dataset_{source_ds.id}",
-                            original_file.name,
+                            model_class=Hubfile,
+                            parent_id_field="feature_model_id",
+                            parent_id_val=new_fm.id,
                         )
 
-                        # Gestión de nombres duplicados
-                        dest_path = os.path.join(dest_folder, original_file.name)
-                        final_filename = original_file.name
+            # --- CASO B: FORMULA ---
+            elif is_all_formula:
+                files_to_copy = source_ds.files()
+                for original_file in files_to_copy:
+                    self._copy_file_physical_and_db(
+                        original_file,
+                        source_ds,
+                        dataset,
+                        dest_folder,
+                        working_dir,
+                        model_class=FormulaFile,
+                        parent_id_field="formula_dataset_id",
+                        parent_id_val=dataset.id,
+                    )
 
-                        if os.path.exists(dest_path):
-                            name, ext = os.path.splitext(original_file.name)
-                            final_filename = f"{name}_{uuid.uuid4().hex[:4]}{ext}"
-                            dest_path = os.path.join(dest_folder, final_filename)
-                            # Actualizamos el nombre en metadatos también para mantener consistencia
-                            new_fm_meta.uvl_filename = final_filename
-
-                        # Copia física
-                        if os.path.exists(source_path):
-                            shutil.copy2(source_path, dest_path)
-
-                            # Registro en DB
-                            new_file = Hubfile(
-                                name=final_filename,
-                                checksum=original_file.checksum,
-                                size=original_file.size,
-                                feature_model_id=new_fm.id,
-                            )
-                            self.repository.session.add(new_file)
-                        else:
-                            logger.warning(f"File missing on disk: {source_path}")
+            # --- CASO C: MEZCLA / RAW ---
+            else:
+                for original_file in source_ds.files():
+                    self._copy_file_physical_only(original_file, source_ds, dest_folder, working_dir)
 
         self.repository.session.commit()
         return dataset
+
+    def _copy_file_physical_and_db(
+        self, original_file, source_ds, new_ds, dest_folder, working_dir, model_class, parent_id_field, parent_id_val
+    ):
+        """
+        Helper para copiar archivo físico y crear registro en DB.
+        """
+        # 1. Calcular ruta ORIGEN
+        if hasattr(original_file, "get_path"):
+            source_path = original_file.get_path()
+        else:
+            source_path = os.path.join(
+                working_dir, "uploads", f"user_{source_ds.user_id}", f"dataset_{source_ds.id}", original_file.name
+            )
+
+        # 2. Calcular ruta DESTINO
+        final_filename = original_file.name
+        dest_path = os.path.join(dest_folder, final_filename)
+
+        if os.path.exists(dest_path):
+            name, ext = os.path.splitext(original_file.name)
+            final_filename = f"{name}_{uuid.uuid4().hex[:4]}{ext}"
+            dest_path = os.path.join(dest_folder, final_filename)
+
+        # 3. Realizar la copia
+        if os.path.exists(source_path):
+            shutil.copy2(source_path, dest_path)
+
+            # Crear registro en DB
+            kwargs = {"name": final_filename, "size": original_file.size, parent_id_field: parent_id_val}
+            # Hubfile tiene checksum, FormulaFile no. Lo añadimos solo si existe.
+            if hasattr(original_file, "checksum"):
+                kwargs["checksum"] = original_file.checksum
+
+            new_db_file = model_class(**kwargs)
+            self.repository.session.add(new_db_file)
+        else:
+            logger.warning(f"File missing on disk during combine: {source_path}")
+
+    def _copy_file_physical_only(self, original_file, source_ds, dest_folder, working_dir):
+        """Helper para copiar solo físico (para RawDataSet)"""
+        source_path = os.path.join(
+            working_dir, "uploads", f"user_{source_ds.user_id}", f"dataset_{source_ds.id}", original_file.name
+        )
+        dest_path = os.path.join(dest_folder, original_file.name)
+
+        if os.path.exists(dest_path):
+            name, ext = os.path.splitext(original_file.name)
+            dest_path = os.path.join(dest_folder, f"{name}_{uuid.uuid4().hex[:4]}{ext}")
+
+        if os.path.exists(source_path):
+            shutil.copy2(source_path, dest_path)
 
     def duplicate_dataset(self, dataset_id: int, user_id: int):
         """

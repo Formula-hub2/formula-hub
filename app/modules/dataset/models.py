@@ -195,7 +195,19 @@ class FormulaFile(db.Model):
     formula_dataset_id = db.Column(db.Integer, db.ForeignKey("formula_dataset.id"), nullable=False)
 
     def get_path(self):
-        return os.path.join(current_app.root_path, "modules", "dataset", "formula_examples", self.name)
+        """
+        Calcula la ruta física dinámica.
+        """
+        ds = self.dataset
+
+        working_dir = os.getenv("WORKING_DIR") or os.path.abspath(os.getcwd())
+        upload_path = os.path.join(working_dir, "uploads", f"user_{ds.user_id}", f"dataset_{ds.id}", self.name)
+
+        if os.path.exists(upload_path):
+            return upload_path
+
+        seed_path = os.path.join(current_app.root_path, "modules", "dataset", "formula_examples", self.name)
+        return seed_path
 
     def to_dict(self):
         return {"id": self.id, "name": self.name, "size": self.size, "url": f"/dataset/formula/file_preview/{self.id}"}

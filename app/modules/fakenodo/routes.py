@@ -108,7 +108,6 @@ def scripts():
 @fakenodo_bp.route("/visualize/<int:dataset_id>", methods=["GET"])
 def visualize_local_dataset(dataset_id):
     """
-    Esta es la función que faltaba o daba error.
     Simula una vista de Zenodo para datasets que están solo en UVLHub (SQL).
     """
     ds_service = DataSetService()
@@ -120,11 +119,13 @@ def visualize_local_dataset(dataset_id):
     files_list = []
 
     try:
-        if hasattr(dataset, "feature_models"):
-            for fm in dataset.feature_models:
-                for f in fm.files:
-                    files_list.append({"filename": f.name, "checksum": f.checksum, "filesize": f.size})
-    except Exception:
+        for f in dataset.files():
+            checksum = getattr(f, "checksum", "N/A")
+
+            files_list.append({"filename": f.name, "checksum": checksum, "filesize": f.size})
+
+    except Exception as e:
+        print(f"Error procesando archivos para visualización: {e}")
         pass
 
     fake_deposit = {

@@ -11,6 +11,9 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from app import create_app, db
+from app.modules.dataset.models import DataSet, DSMetaData
+
 
 class TestExploreSelenium:
     """Test suite para la funcionalidad de explore, carrito de datasets y creación de datasets combinados"""
@@ -32,7 +35,29 @@ class TestExploreSelenium:
         self.vars = {}
 
     def teardown_method(self, method):
-        self.driver.quit()
+        if self.driver:
+            self.driver.quit()
+
+        app = create_app()
+        with app.app_context():
+            datasets_to_delete = (
+                DataSet.query.join(DSMetaData)
+                .filter(
+                    (DSMetaData.title.like("%Dataset_%"))
+                    | (DSMetaData.title.like("%Selenium%"))
+                    | (DSMetaData.title == "Load Test Dataset")  # Usado en locust/tests
+                )
+                .all()
+            )
+
+            if datasets_to_delete:
+                for ds in datasets_to_delete:
+                    db.session.delete(ds)
+
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
 
     def login(self, email="user2@example.com", password="1234"):
         """Helper method para hacer login"""

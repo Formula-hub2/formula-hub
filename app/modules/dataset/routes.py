@@ -37,6 +37,12 @@ doi_mapping_service = DOIMappingService()
 ds_view_record_service = DSViewRecordService()
 
 
+@dataset_bp.route("/dataset/upload/select", methods=["GET"])
+@login_required
+def select_dataset_type():
+    return render_template("dataset/select_type.html")
+
+
 @dataset_bp.route("/dataset/upload", defaults={"dataset_type": "uvl"}, methods=["GET", "POST"])
 @dataset_bp.route("/dataset/upload/<string:dataset_type>", methods=["GET", "POST"])
 @login_required

@@ -7,8 +7,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from app import create_app, db
+from app.modules.dataset.models import DataSet, DSMetaData
 from core.environment.host import get_host_for_selenium_testing
-from core.selenium.common import close_driver, initialize_driver
+from core.selenium.common import initialize_driver
 
 
 class TestDatasetLifecycle:
@@ -18,7 +20,24 @@ class TestDatasetLifecycle:
         self.host = get_host_for_selenium_testing()
 
     def teardown_method(self):
-        close_driver(self.driver)
+        if self.driver:
+            self.driver.quit()
+
+        app = create_app()
+        with app.app_context():
+            datasets_to_delete = (
+                DataSet.query.join(DSMetaData)
+                .filter((DSMetaData.title.like("%Selenium%")) | (DSMetaData.title.like("%Dataset_%")))
+                .all()
+            )
+
+            if datasets_to_delete:
+                for ds in datasets_to_delete:
+                    db.session.delete(ds)
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
 
     def test_full_lifecycle(self):
         driver = self.driver

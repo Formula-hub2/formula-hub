@@ -281,11 +281,16 @@ def test_create_combined_dataset_file_copying():
     source_ds = MagicMock(spec=UVLDataSet)
     source_ds.id = 99
     source_ds.user_id = 5
+    source_ds.dataset_type = "uvl_dataset"
 
     fm_mock = MagicMock()
     fm_mock.fm_meta_data = MagicMock()
+
     file_mock = MagicMock()
     file_mock.name = "original.uvl"
+    file_mock.get_path.return_value = "/tmp/uploads/user_5/dataset_99/original.uvl"
+    file_mock.checksum = "12345"
+
     fm_mock.files = [file_mock]
     source_ds.feature_models = [fm_mock]
 
@@ -309,7 +314,8 @@ def test_create_combined_dataset_file_copying():
 
         assert mock_copy.call_count == 1
         args, _ = mock_copy.call_args
-        assert "original.uvl" in args[0]
+
+        assert "/tmp/uploads/user_5/dataset_99/original.uvl" == args[0]
         assert "dataset_99" in args[0]
 
 
@@ -348,6 +354,7 @@ def test_create_combined_dataset_logic():
     source_ds = MagicMock(spec=UVLDataSet)
     source_ds.id = 99
     source_ds.user_id = 5
+    source_ds.dataset_type = "uvl_dataset"
     fm_mock = MagicMock()
     fm_mock.fm_meta_data = MagicMock()
     fm_mock.files = [MagicMock(name="file.uvl", checksum="123", size=10)]

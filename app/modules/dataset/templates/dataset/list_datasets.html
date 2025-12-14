@@ -137,13 +137,6 @@
                                         <a href="{{ url_for('dataset.duplicate_dataset', dataset_id=local_dataset.id) }}" title="Duplicate">
                                             <i data-feather="copy"></i>
                                         </a>
-
-                                        {# Publicar y Sincronizar (FAKENODO) #}
-                                        <form method="post" action="{{ url_for('fakenodo.publish_or_create_dataset_deposition', dataset_id=local_dataset.id) }}" style="display:inline-block; margin-left:6px;">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary js-publish-sync" title="Publicar y sincronizar">
-                                                Publicar y sincronizar
-                                            </button>
-                                        </form>
                                     </td>
                                 </tr>
                             {% endfor %}

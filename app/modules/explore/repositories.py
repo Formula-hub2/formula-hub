@@ -3,7 +3,7 @@ import re
 import unidecode
 from sqlalchemy import or_
 
-from app.modules.dataset.models import Author, DataSet, DSMetaData, PublicationType
+from app.modules.dataset.models import Author, DataSet, DSMetaData, PublicationType, UVLDataSet
 from app.modules.featuremodel.models import FeatureModel, FMMetaData
 from core.repositories.BaseRepository import BaseRepository
 
@@ -32,19 +32,16 @@ class ExploreRepository(BaseRepository):
             filters.append(DSMetaData.tags.ilike(f"%{word}%"))
 
         datasets = (
-            self.model.query.join(DataSet.ds_meta_data)  # Todos los datasets deben tener metadata
-            .outerjoin(DSMetaData.authors)  # Datasets pueden no tener autores
-            .outerjoin(
-                FeatureModel, DataSet.id == FeatureModel.uvl_dataset_id  # Datasets pueden no tener feature models
-            )
-            .outerjoin(FMMetaData)  # Feature models pueden no tener metadata
+            self.model.query.join(DataSet.ds_meta_data)
+            .outerjoin(DSMetaData.authors)
+            .outerjoin(UVLDataSet, DataSet.id == UVLDataSet.id)
+            .outerjoin(FeatureModel, UVLDataSet.id == FeatureModel.uvl_dataset_id)
+            .outerjoin(FMMetaData)
         )
 
-        # Aplicar filtros solo si existen
         if filters:
             datasets = datasets.filter(or_(*filters))
 
-        # Agregar DISTINCT para evitar duplicados
         datasets = datasets.distinct(DataSet.id)
 
         if publication_type != "any":
@@ -58,14 +55,12 @@ class ExploreRepository(BaseRepository):
                 datasets = datasets.filter(DSMetaData.publication_type == matching_type.name)
 
         if tags:
-            # Condición OR para cada tag (ilike sobre DSMetaData.tags)
             tag_filters = []
             for tag in tags:
                 tag_filters.append(DSMetaData.tags.ilike(f"%{tag}%"))
             if tag_filters:
                 datasets = datasets.filter(or_(*tag_filters))
 
-        # Order by created_at
         if sorting == "oldest":
             datasets = datasets.order_by(self.model.created_at.asc())
         else:
