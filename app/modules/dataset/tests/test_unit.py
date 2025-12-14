@@ -511,15 +511,13 @@ def test_form_publication_type_conversion():
     assert res == "NONE"
 
 
-def test_uvlhub_doi_generation():
-    """
-    Verifica la generación de la URL del DOI.
-    """
-
+def test_uvlhub_doi_generation(test_client):
     service = DataSetService()
     mock_ds = MagicMock()
+    mock_ds.id = 1
     mock_ds.ds_meta_data.dataset_doi = "10.1234/foo"
 
-    with patch("app.modules.dataset.services.os.getenv", return_value="uvlhub.io"):
+    with test_client.application.test_request_context():
         url = service.get_uvlhub_doi(mock_ds)
-        assert url == "http://uvlhub.io/doi/10.1234/foo"
+
+        assert "/fakenodo/visualize/1" in url

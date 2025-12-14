@@ -124,7 +124,6 @@ class DataSetSeeder(BaseSeeder):
 
         for i in range(12):
             file_name = f"file{i+1}.uvl"
-            # Verificación de seguridad por si no tienes los archivos creados
             if not os.path.exists(os.path.join(uvl_src_folder, file_name)):
                 continue
 
@@ -147,7 +146,7 @@ class DataSetSeeder(BaseSeeder):
             self.seed([uvl_file])
 
         # ==============================================================================
-        # PARTE 2: FORMULA 1 DATASETS (LÓGICA DE EQUIPOS QUE PEDISTE)
+        # PARTE 2: FORMULA 1 DATASETS
         # ==============================================================================
         formula_src_folder = os.path.join(working_dir, "app", "modules", "dataset", "formula_examples")
 
@@ -201,7 +200,6 @@ class DataSetSeeder(BaseSeeder):
                         src_path = os.path.join(formula_src_folder, csv_file)
                         dest_path = os.path.join(dest_formula_dir, csv_file)
 
-                        # Copiar físico si no existe en destino (para que la app lo encuentre)
                         if not os.path.exists(dest_path):
                             shutil.copy(src_path, dest_path)
 

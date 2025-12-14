@@ -6,10 +6,10 @@
 
     <h1 class="h3 mb-3">My datasets</h1>
 
+    {# --- TABLA 1: Datasets Sincronizados (Publicados) --- #}
     {% if datasets %}
-        <div class=" col-12">
+        <div class="col-12">
             <div class="card">
-
                 <div class="card-body">
                     <table class="table">
                         <thead>
@@ -33,14 +33,25 @@
                                 <td>{{ dataset.ds_meta_data.description }}</td>
                                 <td>{{ dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
                                 <td class="js-download-count">{{ dataset.download_count }}</td>
-                                <td><a href="{{ dataset.get_uvlhub_doi() }}"
-                                       target="_blank">{{ dataset.get_uvlhub_doi() }}</a></td>
                                 <td>
-                                    <a href="{{ dataset.get_uvlhub_doi() }}">
+                                    <a href="{{ dataset.get_uvlhub_doi() }}" target="_blank">
+                                        {{ dataset.get_uvlhub_doi() }}
+                                    </a>
+                                </td>
+                                <td>
+                                    {# Ver #}
+                                    <a href="{{ dataset.get_uvlhub_doi() }}" title="View">
                                         <i data-feather="eye"></i>
                                     </a>
-                                    <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}" class="js-download-trigger">
+
+                                    {# Descargar #}
+                                    <a href="{{ url_for('dataset.download_dataset', dataset_id=dataset.id) }}" class="js-download-trigger" title="Download">
                                         <i data-feather="download"></i>
+                                    </a>
+
+                                    {# Duplicar (NUEVO) #}
+                                    <a href="{{ url_for('dataset.duplicate_dataset', dataset_id=dataset.id) }}" title="Duplicate">
+                                        <i data-feather="copy"></i>
                                     </a>
                                 </td>
                             </tr>
@@ -48,9 +59,7 @@
                         </tbody>
                     </table>
                 </div>
-
             </div>
-
         </div>
     {% else %}
         <div class="col-12 col-md-6">
@@ -60,7 +69,7 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        You have not created any dataset synchronized with Zenodo, are you up for it?
+                        You have not created any dataset synchronized with Fakenodo, are you up for it?
                     </p>
                     <div class="btn-group">
                         <a href="{{ url_for('dataset.create_dataset', dataset_type='uvl') }}" class="btn btn-primary">
@@ -83,86 +92,104 @@
         </div>
     {% endif %}
 
-    <div class="row">
-
-
+    {# --- TABLA 2: Datasets Locales (No Sincronizados) --- #}
+    <div class="row mt-4">
         <div class="col-12">
             {% if local_datasets %}
                 <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Unsynchronized datasets</h5>
+                    </div>
                     <div class="card-body">
-                        <div class="card-header">
-                            <h5 class="card-title">Unsynchronized datasets</h5>
-                        </div>
-                        <div class="card-body">
-                            <table class="table">
-                                <thead>
+                        <table class="table">
+                            <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Description</th>
+                                <th>Publication type</th>
+                                <th>Downloads</th>
+                                <th>Options</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for local_dataset in local_datasets %}
                                 <tr>
-                                    <th>Title</th>
-                                    <th>Description</th>
-                                    <th>Publication type</th>
-                                    <th>Downloads</th>
-                                    <th>Options</th>
+                                    <td>
+                                        <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}">
+                                            {{ local_dataset.ds_meta_data.title }}
+                                        </a>
+                                    </td>
+                                    <td>{{ local_dataset.ds_meta_data.description }}</td>
+                                    <td>{{ local_dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
+                                    <td class="js-download-count">{{ local_dataset.download_count }}</td>
+                                    <td>
+                                        {# Ver #}
+                                        <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}" title="View">
+                                            <i data-feather="eye"></i>
+                                        </a>
+
+                                        {# Descargar #}
+                                        <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}" class="js-download-trigger" title="Download">
+                                            <i data-feather="download"></i>
+                                        </a>
+
+                                        {# Duplicar (NUEVO) #}
+                                        <a href="{{ url_for('dataset.duplicate_dataset', dataset_id=local_dataset.id) }}" title="Duplicate">
+                                            <i data-feather="copy"></i>
+                                        </a>
+
+                                        {# Publicar y Sincronizar (FAKENODO) #}
+                                        <form method="post" action="{{ url_for('fakenodo.publish_or_create_dataset_deposition', dataset_id=local_dataset.id) }}" style="display:inline-block; margin-left:6px;">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary js-publish-sync" title="Publicar y sincronizar">
+                                                Publicar y sincronizar
+                                            </button>
+                                        </form>
+                                    </td>
                                 </tr>
-                                </thead>
-                                <tbody>
-                                {% for local_dataset in local_datasets %}
-                                    <tr>
-                                        <td>
-                                            <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}">
-                                                {{ local_dataset.ds_meta_data.title }}
-                                            </a>
-                                        </td>
-                                        <td>{{ local_dataset.ds_meta_data.description }}</td>
-                                        <td>{{ local_dataset.ds_meta_data.publication_type.name.replace('_', ' ').title() }}</td>
-                                        <td class="js-download-count">{{ local_dataset.download_count }}</td>
-                                        <td>
-                                            <a href="{{ url_for('dataset.get_unsynchronized_dataset', dataset_id=local_dataset.id) }}">
-                                                <i data-feather="eye"></i>
-                                            </a>
-                                            <a href="{{ url_for('dataset.download_dataset', dataset_id=local_dataset.id) }}" class="js-download-trigger">
-                                                <i data-feather="download"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                            {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             {% endif %}
         </div>
     </div>
 
-
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Aseguramos que Feather icons se carguen (si no lo hace el base template)
+        // Inicializar iconos Feather
         if (typeof feather !== 'undefined') {
             feather.replace();
         }
 
+        // Lógica para incrementar contador visual de descargas
         const buttons = document.querySelectorAll('.js-download-trigger');
-
         buttons.forEach(button => {
             button.addEventListener('click', function() {
-                // 1. Subimos hasta encontrar la fila (tr) donde está este botón
                 const row = this.closest('tr');
-
                 if (row) {
-                    // 2. Buscamos la celda del contador DENTRO de esa fila
                     const countCell = row.querySelector('.js-download-count');
-
                     if (countCell) {
-                        // 3. Magia matemática
                         let currentCount = parseInt(countCell.innerText.trim());
                         if (!isNaN(currentCount)) {
                             countCell.innerText = currentCount + 1;
                         }
                     }
+                }
+            });
+        });
+
+        // Confirmación para publicar
+        const publishForms = document.querySelectorAll('.js-publish-sync');
+        publishForms.forEach(btn => {
+            const form = btn.closest('form');
+            if (!form) return;
+            form.addEventListener('submit', function (ev) {
+                if (!confirm('¿Desea publicar y sincronizar este dataset?')) {
+                    ev.preventDefault();
                 }
             });
         });

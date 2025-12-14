@@ -1,0 +1,73 @@
+{% extends "base_template.html" %}
+
+{% block title %}{{ deposit.title }} | Fakenodo{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+
+    <div class="row">
+        <div class="col-md-9">
+            <span class="badge bg-secondary mb-2">Publication</span>
+            <h1 class="mb-4">{{ deposit.metadata.title }}</h1>
+
+            <div class="alert alert-info">
+                <i data-feather="info"></i> This is a mock record hosted on <strong>Fakenodo</strong>.
+            </div>
+
+            <h4 class="mt-4">Description</h4>
+            <p class="lead">{{ deposit.metadata.description or "No description provided." }}</p>
+
+            <h4 class="mt-4">Files</h4>
+            <div class="card">
+                <ul class="list-group list-group-flush">
+                    {% for file in deposit.files %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ file.filename }}</strong>
+                            <br>
+                            <small class="text-muted">md5:{{ file.checksum }}</small>
+                        </div>
+                        <span class="badge bg-light text-dark">{{ file.filesize }} bytes</span>
+                    </li>
+                    {% else %}
+                    <li class="list-group-item text-muted">No files attached.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card mb-3">
+                <div class="card-body bg-light">
+                    <h5 class="card-title text-muted text-uppercase small">Versions</h5>
+                    <p>Version {{ deposit.version_count }} (latest)</p>
+                    <hr>
+                    <div class="mb-3">
+                        <small class="text-muted d-block">DOI</small>
+                        <span class="badge bg-dark">{{ deposit.doi }}</span>
+                    </div>
+                    <div class="mb-3">
+                        <small class="text-muted d-block">Published</small>
+                        <strong>{{ deposit.modified }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body text-center">
+                    <img src="{{ url_for('static', filename='img/logos/logo-formulahub.png') }}" class="img-fluid mb-2" style="opacity: 0.5; width: 50px;">
+                    <p class="small text-muted">Powered by Fakenodo</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        if (typeof feather !== 'undefined') {
+            feather.replace();
+        }
+    });
+</script>
+{% endblock %}
