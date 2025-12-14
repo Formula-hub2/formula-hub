@@ -78,19 +78,6 @@ class DataSetService(BaseService):
         return self.dsmetadata_repository.update(id, **kwargs)
 
     def get_uvlhub_doi(self, dataset: DataSet) -> str:
-        doi = dataset.ds_meta_data.dataset_doi
-
-        # CASO 1: Es un dataset de Fakenodo (Nuevo)
-        if doi and "zenodo" in doi:
-            try:
-                partes = doi.split("zenodo.")[1].split(".")
-                dep_id = partes[0]
-                return url_for("fakenodo.get_deposition", deposition_id=int(dep_id), _external=True)
-            except Exception:
-                pass
-
-        # CASO 2: Es un dataset antiguo (Formula 1, etc.)
-        # En vez de devolver el enlace interno aburrido, lo mandamos al visualizador
         return url_for("fakenodo.visualize_local_dataset", dataset_id=dataset.id, _external=True)
 
     def create_combined_dataset(self, current_user, title, description, publication_type, tags, source_dataset_ids):

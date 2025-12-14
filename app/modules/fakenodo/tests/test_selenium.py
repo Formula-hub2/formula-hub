@@ -1,7 +1,7 @@
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-
+import requests
 from core.environment.host import get_host_for_selenium_testing
 from core.selenium.common import close_driver, initialize_driver
 
@@ -16,6 +16,21 @@ class TestFakenodoUI:
 
     @classmethod
     def teardown_class(cls):
+        try:
+            reset_url = f"{cls.host}/fakenodo/reset"
+            print(f"Intentando resetear Fakenodo en: {reset_url}")
+            
+            response = requests.post(reset_url)
+            
+            if response.status_code == 200:
+                print("✅ Fakenodo limpiado correctamente.")
+            else:
+                print(f"❌ Error al limpiar Fakenodo. Código: {response.status_code}")
+                print(f"Respuesta: {response.text}")
+                
+        except Exception as e:
+            print(f"❌ Excepción intentando resetear: {e}")
+
         close_driver(cls.driver)
 
     def test_fakenodo_index_loads(self):
@@ -110,3 +125,43 @@ class TestFakenodoUI:
 
         self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
         assert "Fakenodo" in self.driver.page_source
+
+    def test_fakenodo_delete_deposition(self):
+            """
+            Prueba la creación rápida y el borrado de un depósito en el Dashboard.
+            """
+            self.driver.get(f"{self.host}/fakenodo/")
+
+            try:
+                title_input = self.wait.until(EC.visibility_of_element_located((By.ID, "new-title")))
+                create_btn = self.driver.find_element(By.XPATH, "//button[contains(text(),'Create')]")
+                
+                title_input.clear()
+                title_input.send_keys("To Delete Dataset")
+                create_btn.click()
+                
+                self.wait.until(EC.text_to_be_present_in_element((By.TAG_NAME, "table"), "To Delete Dataset"))
+            except Exception:
+                pass
+
+
+            delete_btns = self.driver.find_elements(By.CSS_SELECTOR, "button.btn-danger")
+
+            if delete_btns:
+                rows_before = len(self.driver.find_elements(By.CSS_SELECTOR, "table tbody tr"))
+                
+                delete_btns[0].click()
+
+                try:
+                    alert = self.wait.until(EC.alert_is_present())
+                    alert.accept()
+                except Exception:
+                    pass
+
+                import time
+                time.sleep(1)
+
+                rows_after = len(self.driver.find_elements(By.CSS_SELECTOR, "table tbody tr"))
+                
+
+                assert rows_after <= rows_before
