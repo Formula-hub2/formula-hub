@@ -236,15 +236,13 @@ class TestExploreSelenium:
         self.login()
         self.navigate_to_explore()
 
-        add_btns = WebDriverWait(self.driver, 10).until(
-            lambda d: d.find_elements(By.CLASS_NAME, "btn-add-to-cart")
-        )
+        add_btns = WebDriverWait(self.driver, 10).until(lambda d: d.find_elements(By.CLASS_NAME, "btn-add-to-cart"))
 
         if not add_btns:
             pytest.skip("No hay datasets disponibles para añadir al carrito")
 
         add_btns[0].click()
-        
+
         WebDriverWait(self.driver, 10).until(EC.text_to_be_present_in_element((By.ID, "cart-count-badge"), "1"))
 
         # Abrir modal

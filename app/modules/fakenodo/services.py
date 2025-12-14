@@ -175,7 +175,7 @@ class FakenodoService:
 
     def test_full_connection(self):
         return jsonify({"success": True, "message": "Fakenodo persistent service is running."})
-    
+
     def reset(self):
         """Borra todo de la memoria y del disco"""
         self._store = {}

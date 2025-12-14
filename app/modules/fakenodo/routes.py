@@ -104,10 +104,12 @@ def test_endpoint():
 def scripts():
     return send_from_directory(fakenodo_bp.static_folder, "scripts.js")
 
+
 @fakenodo_bp.route("/reset", methods=["POST"], endpoint="reset")
 def reset():
     fakenodo_service.reset()
     return jsonify({"message": "Fakenodo reset successful"}), 200
+
 
 @fakenodo_bp.route("/visualize/<int:dataset_id>", methods=["GET"])
 def visualize_local_dataset(dataset_id):
@@ -147,5 +149,3 @@ def visualize_local_dataset(dataset_id):
     }
 
     return render_template("fakenodo/deposition.html", deposit=fake_deposit)
-
-    
