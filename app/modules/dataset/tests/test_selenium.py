@@ -4,6 +4,8 @@ import time
 import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from core.environment.host import get_host_for_selenium_testing
 from core.selenium.common import close_driver, initialize_driver
@@ -57,10 +59,10 @@ class TestDatasetLifecycle:
 
         # 2. CREA EL DATASET
         driver.get(f"{self.host}/dataset/upload")
-        time.sleep(2)
 
         # 3. COMPLETA EL FORMULARIO
-        title_field = driver.find_element(By.NAME, "title")
+        wait = WebDriverWait(driver, 10)
+        title_field = wait.until(EC.visibility_of_element_located((By.NAME, "title")))
         title_field.send_keys(dataset_title)
 
         driver.find_element(By.NAME, "desc").send_keys("Description for un test de prueba")

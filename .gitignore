@@ -23,7 +23,7 @@ __pycache__/
 # Logs & coverage
 # ==========================
 *.log
-app.log
+app.log.*
 deployments.log
 .coverage
 htmlcov/

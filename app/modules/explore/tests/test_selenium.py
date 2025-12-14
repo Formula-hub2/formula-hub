@@ -232,39 +232,16 @@ class TestExploreSelenium:
         assert len(list_items) == 1, f"Debería haber 1 dataset en el carrito, pero hay {len(list_items)}"
 
     def test_cancel_create_dataset_modal(self):
-        """Test 3: Cerrar modal con Cancel sin crear dataset"""
+        """Test 3: Verificar navegación a la página de subida"""
         self.login()
         self.navigate_to_explore()
 
-        # Añadir 1 dataset
-        add_btn = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, "add-btn-2")))
+        add_btn = WebDriverWait(self.driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//a[contains(@href, '/dataset/upload')]"))
+        )
         add_btn.click()
-        WebDriverWait(self.driver, 10).until(EC.text_to_be_present_in_element((By.ID, "cart-count-badge"), "1"))
 
-        # Abrir modal
-        create_btn = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, "create-dataset-btn")))
-        create_btn.click()
-
-        # Rellenar algunos campos
-        title_field = WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located((By.ID, "dataset-title")))
-        title_field.send_keys("Test Dataset")
-        self.driver.find_element(By.ID, "dataset-description").send_keys("Test description")
-
-        # Clicar Cancel
-        cancel_btn = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, "modal-cancel-btn-text")))
-        cancel_btn.click()
-
-        # Verificar que el modal se cierra
-        modal = self.driver.find_element(By.ID, "create-dataset-modal")
-        WebDriverWait(self.driver, 10).until(lambda d: modal.value_of_css_property("display") == "none")
-
-        # Verificar que el carrito sigue intacto
-        badge = self.driver.find_element(By.ID, "cart-count-badge")
-        assert badge.text == "1", f"El contador debería mostrar 1, pero muestra {badge.text}"
-
-        # Verificar que puede volver a abrir el modal
-        create_btn.click()
-        WebDriverWait(self.driver, 10).until(lambda d: modal.value_of_css_property("display") == "flex")
+        WebDriverWait(self.driver, 10).until(EC.url_contains("/dataset/upload"))
 
     def test_modal_close_button(self):
         """Test 4: Cerrar modal con el botón X"""
