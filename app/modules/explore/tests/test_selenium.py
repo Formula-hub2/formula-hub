@@ -35,29 +35,50 @@ class TestExploreSelenium:
         self.vars = {}
 
     def teardown_method(self, method):
+        # 1. Cerrar navegador primero
         if self.driver:
             self.driver.quit()
 
+        # 2. Limpieza de base de datos segura y específica
         app = create_app()
         with app.app_context():
-            datasets_to_delete = (
-                DataSet.query.join(DSMetaData)
-                .filter(
-                    (DSMetaData.title.like("%Dataset_%"))
-                    | (DSMetaData.title.like("%Selenium%"))
-                    | (DSMetaData.title == "Load Test Dataset")  # Usado en locust/tests
+            try:
+                # Buscamos por PATRONES claros usados en los tests
+                # Usaremos la base 'Selenium Test' y 'Dataset_'
+                datasets_to_delete = (
+                    DataSet.query.join(DSMetaData)
+                    .filter(
+                        (DSMetaData.title.like("Dataset_%"))  # Cualquier nombre que empiece por 'Dataset_'
+                        | (DSMetaData.title.like("%Selenium%"))  # Cualquier dataset que contenga 'Selenium'
+                        | (DSMetaData.title == "Load Test Dataset")
+                    )
+                    .all()
                 )
-                .all()
-            )
 
-            if datasets_to_delete:
-                for ds in datasets_to_delete:
-                    db.session.delete(ds)
-
-                try:
-                    db.session.commit()
-                except Exception:
-                    db.session.rollback()
+                if datasets_to_delete:
+                    print(f"🧹 Encontrados {len(datasets_to_delete)} datasets para borrar...")
+                    for ds in datasets_to_delete:
+                        # Intento de borrado individual con rollback interno
+                        try:
+                            db.session.delete(ds)
+                            db.session.commit()
+                        except Exception as e:
+                            db.session.rollback()
+                            print(f"❌ Error borrando Dataset {ds.id}: {e}")
+                            # Si falla, borrado forzado de metadatos asociados para no dejar basuras huérfanas
+                            try:
+                                db.session.query(DataSet).filter_by(id=ds.id).delete()
+                                if ds.ds_meta_data_id:
+                                    db.session.query(DSMetaData).filter_by(id=ds.ds_meta_data_id).delete()
+                                db.session.commit()
+                            except Exception as e2:
+                                print(f"💀 Imposible forzar borrado del dataset {ds.id}. Deuda técnica: {e2}")
+                                db.session.rollback()
+            except Exception as global_error:
+                print(f"💀 Error catastrófico durante la limpieza: {global_error}")
+                db.session.rollback()
+            finally:
+                db.session.remove()
 
     def login(self, email="user2@example.com", password="1234"):
         """Helper method para hacer login"""
@@ -256,23 +277,15 @@ class TestExploreSelenium:
         list_items = selected_list.find_elements(By.CSS_SELECTOR, "li:not(#empty-cart-message)")
         assert len(list_items) == 1, f"Debería haber 1 dataset en el carrito, pero hay {len(list_items)}"
 
-    def test_cancel_create_dataset_modal(self):
-        """Test 3: Verificar navegación a la página de subida"""
+    def test_navigation_to_upload_page(self):
+        """Test 3: Verificar navegación a la página de subida desde Explore"""
         self.login()
         self.navigate_to_explore()
 
-        add_btn = WebDriverWait(self.driver, 10).until(
+        upload_link = WebDriverWait(self.driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//a[contains(@href, '/dataset/upload')]"))
         )
-        add_btn.click()
-        add_btns = WebDriverWait(self.driver, 10).until(lambda d: d.find_elements(By.CLASS_NAME, "btn-add-to-cart"))
-
-        if not add_btns:
-            pytest.skip("No hay datasets disponibles para añadir al carrito")
-
-        add_btns[0].click()
-
-        WebDriverWait(self.driver, 10).until(EC.text_to_be_present_in_element((By.ID, "cart-count-badge"), "1"))
+        upload_link.click()
 
         WebDriverWait(self.driver, 10).until(EC.url_contains("/dataset/upload"))
 

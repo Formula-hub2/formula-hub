@@ -13,16 +13,24 @@ from app.modules.dataset.services import DataSetService, RawDataSetService, UVLD
 @pytest.fixture(scope="module")
 def test_user(test_client):
     """
-    Crea un usuario maestro una sola vez para todo el módulo y lo reutiliza.
-    Esto acelera los tests evitando crear/borrar usuario en cada función.
+    Crea un usuario maestro una sola vez para todo el módulo.
+    MEJORA: Limpia preventivamente por si una ejecución anterior falló.
     """
+    # 1. Limpieza preventiva (por si quedó sucio de antes)
+    existing_user = User.query.filter_by(email="unit_test_master@example.com").first()
+    if existing_user:
+        db.session.delete(existing_user)
+        db.session.commit()
+
+    # 2. Creación
     user = User(email="unit_test_master@example.com", password="password123")
     db.session.add(user)
     db.session.commit()
 
     yield user
 
-    # Limpieza final del módulo
+    # 3. Limpieza final
+    db.session.rollback()  # Asegurar sesión limpia antes de borrar
     db.session.expire_all()
     user_to_delete = db.session.get(User, user.id)
     if user_to_delete:
@@ -33,8 +41,7 @@ def test_user(test_client):
 @pytest.fixture
 def dataset_fixture(test_user):
     """
-    Fixture específica para tests de CONTADOR.
-    Crea un dataset limpio y asegura su destrucción quirúrgica para evitar IntegrityErrors.
+    Fixture para tests de CONTADOR.
     """
     meta = DSMetaData(
         title="Counter Check Dataset",
@@ -52,7 +59,10 @@ def dataset_fixture(test_user):
     yield dataset
 
     try:
+        db.session.rollback()
         db.session.expire_all()
+
+        # Limpiar dependencias primero
         DSDownloadRecord.query.filter_by(dataset_id=dataset.id).delete()
 
         if db.session.get(DataSet, dataset.id):
@@ -69,16 +79,25 @@ def dataset_fixture(test_user):
 @pytest.fixture
 def clean_datasets(test_user):
     """
-    Fixture específica para tests de POLIMORFISMO.
+    Fixture para tests de POLIMORFISMO.
     Limpia cualquier dataset del usuario antes y después del test.
     """
-    yield
-    # Borrado masivo seguro después de cada test
+    # Limpieza inicial por seguridad
     db.session.rollback()
-    datasets = DataSet.query.filter_by(user_id=test_user.id).all()
-    for ds in datasets:
-        db.session.delete(ds)
+    DataSet.query.filter_by(user_id=test_user.id).delete()
     db.session.commit()
+
+    yield
+
+    # Limpieza final
+    try:
+        db.session.rollback()  # Deshacer cambios pendientes del test
+        datasets = DataSet.query.filter_by(user_id=test_user.id).all()
+        for ds in datasets:
+            db.session.delete(ds)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def test_download_counter_backend_logic(test_client, dataset_fixture):
@@ -86,6 +105,7 @@ def test_download_counter_backend_logic(test_client, dataset_fixture):
     Verifica que el contador sube al llamar a la ruta, mockeando el sistema de archivos.
     """
     dataset_id = dataset_fixture.id
+    initial_count = dataset_fixture.download_count
 
     with (
         patch("app.modules.dataset.routes.os.path.exists", return_value=True),
@@ -103,7 +123,7 @@ def test_download_counter_backend_logic(test_client, dataset_fixture):
     db.session.expire_all()
     dataset_refreshed = db.session.get(DataSet, dataset_id)
 
-    assert dataset_refreshed.download_count == 1, f"El contador debería ser 1, es {dataset_refreshed.download_count}"
+    assert dataset_refreshed.download_count == initial_count + 1
 
 
 def test_download_counter_idempotency_check(test_client, dataset_fixture):
@@ -111,6 +131,7 @@ def test_download_counter_idempotency_check(test_client, dataset_fixture):
     Verifica comportamiento con múltiples descargas.
     """
     dataset_id = dataset_fixture.id
+    initial_count = dataset_fixture.download_count
 
     with (
         patch("app.modules.dataset.routes.os.path.exists", return_value=True),
@@ -124,7 +145,7 @@ def test_download_counter_idempotency_check(test_client, dataset_fixture):
     db.session.expire_all()
     dataset_refreshed = db.session.get(DataSet, dataset_id)
 
-    assert dataset_refreshed.download_count >= 1
+    assert dataset_refreshed.download_count >= initial_count + 1
 
 
 def test_polymorphic_retrieval(test_user, clean_datasets):
@@ -334,15 +355,16 @@ def test_raw_dataset_creation_metadata():
     mock_user = MagicMock()
     mock_user.profile.surname = "Doe"
 
+    # Mock para la creación de metadatos (devuelve un objeto con ID)
+    service.dsmetadata_repository.create.return_value = MagicMock(id=100)
+
     service.create_from_form(mock_form, mock_user)
 
     service.author_repository.create.assert_called()
     call_args = service.author_repository.create.call_args[1]
     assert "Doe" in call_args["name"]
 
-    service.repository.create.assert_called_with(
-        commit=True, user_id=mock_user.id, ds_meta_data_id=service.dsmetadata_repository.create.return_value.id
-    )
+    service.repository.create.assert_called_with(commit=True, user_id=mock_user.id, ds_meta_data_id=100)
 
 
 def test_create_combined_dataset_logic():
