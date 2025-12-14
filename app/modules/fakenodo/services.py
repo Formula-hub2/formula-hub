@@ -176,6 +176,15 @@ class FakenodoService:
     def test_full_connection(self):
         return jsonify({"success": True, "message": "Fakenodo persistent service is running."})
 
+    def reset(self):
+        """Borra todo de la memoria y del disco"""
+        self._store = {}
+        self._id_seq = itertools.count(1000)
+        if os.path.exists(self.db_path):
+            try:
+                os.remove(self.db_path)
+            except OSError:
+                pass
 
-# Instancia singleton para importar
+
 service = FakenodoService()
