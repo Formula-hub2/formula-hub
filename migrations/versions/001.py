@@ -367,6 +367,16 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("session_id"),
     )
+
+    op.create_table(
+        "fakenodo",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("meta_data", sa.JSON(), nullable=False),
+        sa.Column("status", sa.String(length=100), nullable=False, server_default="draft"),
+        sa.Column("doi", sa.String(length=250), nullable=True),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("doi"),
+    )
     # ### end Alembic commands ###
 
 
@@ -395,4 +405,5 @@ def downgrade():
     op.drop_table("doi_mapping")
     op.drop_table("user_session")
     op.drop_table("notepad")
+    op.drop_table("fakenodo")
     # ### end Alembic commands ###
