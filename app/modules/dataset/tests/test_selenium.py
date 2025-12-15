@@ -1,4 +1,5 @@
 import os
+import time
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -44,18 +45,19 @@ class TestDatasetLifecycle:
 
             # 1. LOGIN
             driver.get(f"{self.host}/login")
+            time.sleep(2)
 
-            email_field = self.wait.until(EC.visibility_of_element_located((By.NAME, "email")))
-            password_field = driver.find_element(By.NAME, "password")
+            driver.find_element(By.NAME, "email").send_keys("user2@example.com")
+            driver.find_element(By.NAME, "password").send_keys("1234" + Keys.RETURN)
+            time.sleep(2)
 
-            email_field.send_keys("user2@example.com")
-            password_field.send_keys("1234")
-            password_field.send_keys(Keys.RETURN)
+            assert "/login" not in driver.current_url, "Login falló"
 
-            self.wait.until(EC.presence_of_element_located((By.XPATH, "//h1[contains(., 'Latest datasets')]")))
+            time.sleep(2)
 
             # 2. CREA EL DATASET
             driver.get(f"{self.host}/dataset/upload")
+            time.sleep(2)
 
             # 3. COMPLETA EL FORMULARIO
             title_field = self.wait.until(EC.element_to_be_clickable((By.NAME, "title")))
@@ -77,18 +79,13 @@ class TestDatasetLifecycle:
             driver.execute_script("arguments[0].click();", agree_checkbox)
 
             # 6. ENVIA EL FORMULARIO
-            upload_btn = driver.find_element(By.ID, "upload_button")
-
-            current_url = driver.current_url
-            driver.execute_script("arguments[0].click();", upload_btn)
-
-            self.wait.until(EC.url_changes(current_url))
-            # -------------------------------
+            driver.execute_script("document.getElementById('upload_button').click();")
+            time.sleep(2)
 
             # 7. VERIFICA QUE SE CREÓ
             driver.get(f"{self.host}/dataset/list")
-
-            self.wait.until(EC.text_to_be_present_in_element((By.TAG_NAME, "body"), dataset_title))
+            time.sleep(2)
+            assert dataset_title in driver.page_source, "El dataset no fue creado correctamente."
 
         finally:
             if os.path.exists(file_path):
