@@ -26,6 +26,7 @@ from app.modules.dataset.repositories import (
     DSDownloadRecordRepository,
     DSMetaDataRepository,
     DSViewRecordRepository,
+    FormulaFileRepository,
 )
 from app.modules.featuremodel.models import FeatureModel, FMMetaData
 from app.modules.featuremodel.repositories import (
@@ -350,6 +351,7 @@ class FormulaDataSetService(DataSetService):
     def __init__(self):
         super().__init__()
         self.repository = BaseRepository(FormulaDataSet)
+        self.formulafiles_repository = FormulaFileRepository()
 
     def create_from_form(self, form, current_user) -> FormulaDataSet:
         # 1. Crear Metadatos
@@ -374,7 +376,6 @@ class FormulaDataSetService(DataSetService):
             commit=True,
             user_id=current_user.id,
             ds_meta_data_id=dsmetadata.id,
-            file_name=filename,  # Columna específica de FormulaDataSet
         )
 
         # 5. Guardar archivo físico
@@ -385,9 +386,18 @@ class FormulaDataSetService(DataSetService):
         file_path = os.path.join(dest_folder, filename)
         file.save(file_path)
 
+        file_size = os.path.getsize(file_path)
+
+        # 6. Registrar FormulaFile en la base de datos
+        self.formulafiles_repository.create(
+            commit=True,  # Commit aquí para asegurar que el archivo se registre
+            name=filename,
+            size=file_size,
+            formula_dataset_id=dataset.id,
+        )
+
         return dataset
 
-    # Para cumplir con la interfaz, aunque no mueve nada extra
     def move_feature_models(self, dataset):
         pass
 

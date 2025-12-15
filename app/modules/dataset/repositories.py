@@ -5,10 +5,23 @@ from typing import Optional
 from flask_login import current_user
 from sqlalchemy import desc, func
 
-from app.modules.dataset.models import Author, DataSet, DOIMapping, DSDownloadRecord, DSMetaData, DSViewRecord
+from app.modules.dataset.models import (
+    Author,
+    DataSet,
+    DOIMapping,
+    DSDownloadRecord,
+    DSMetaData,
+    DSViewRecord,
+    FormulaFile,
+)
 from core.repositories.BaseRepository import BaseRepository
 
 logger = logging.getLogger(__name__)
+
+
+class FormulaFileRepository(BaseRepository):
+    def __init__(self):
+        super().__init__(FormulaFile)
 
 
 class AuthorRepository(BaseRepository):

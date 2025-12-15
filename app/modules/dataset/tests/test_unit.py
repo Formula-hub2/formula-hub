@@ -101,24 +101,25 @@ def clean_datasets(test_user):
 
 
 def test_download_counter_backend_logic(test_client, dataset_fixture):
-    """
-    Verifica que el contador sube al llamar a la ruta, mockeando el sistema de archivos.
-    """
     dataset_id = dataset_fixture.id
     initial_count = dataset_fixture.download_count
 
+    mock_file = MagicMock(name="mock_file.txt")
+    mock_file.get_path.return_value = "/mock/path/file.txt"
+    mock_file.name = "mock_file.txt"
+
     with (
+        patch.object(dataset_fixture, "files", return_value=[mock_file]),
         patch("app.modules.dataset.routes.os.path.exists", return_value=True),
         patch("app.modules.dataset.routes.os.makedirs"),
-        patch("app.modules.dataset.routes.os.walk", return_value=[]),
         patch("app.modules.dataset.routes.ZipFile", MagicMock()),
         patch("app.modules.dataset.routes.send_from_directory") as mock_send,
     ):
-
         mock_send.return_value = "File sent"
 
         response = test_client.get(f"/dataset/download/{dataset_id}")
-        assert response.status_code == 200
+
+        assert response.status_code == 200, f"Se esperaba 200 OK, se recibió {response.status_code}"
 
     db.session.expire_all()
     dataset_refreshed = db.session.get(DataSet, dataset_id)

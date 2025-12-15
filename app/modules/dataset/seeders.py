@@ -3,7 +3,6 @@ import shutil
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
-from flask import current_app
 
 from app.modules.auth.models import User
 from app.modules.dataset.models import (
@@ -39,7 +38,7 @@ class DataSetSeeder(BaseSeeder):
             working_dir = os.path.abspath(os.getcwd())
 
         # ==============================================================================
-        # PARTE 1: UVL DATASETS
+        # PARTE 1: UVL DATASETS (Se mantiene - Ya copia a uploads)
         # ==============================================================================
 
         # Create DSMetrics instance
@@ -150,9 +149,10 @@ class DataSetSeeder(BaseSeeder):
         # ==============================================================================
         formula_src_folder = os.path.join(working_dir, "app", "modules", "dataset", "formula_examples")
 
-        # Destino físico para Formula (donde la app busca los CSVs para previsualizar)
-        dest_formula_dir = os.path.join(current_app.root_path, "modules", "dataset", "formula_examples")
-        os.makedirs(dest_formula_dir, exist_ok=True)
+        # Eliminar el bloque de dest_formula_dir que era el problemático
+        # Ya no necesitamos dest_formula_dir aquí, los archivos van a uploads.
+        # Nos aseguramos de que esta carpeta de *seeding* exista
+        os.makedirs(formula_src_folder, exist_ok=True)
 
         if os.path.exists(formula_src_folder):
 
@@ -196,14 +196,24 @@ class DataSetSeeder(BaseSeeder):
                     seeded_dataset = self.seed([formula_dataset])[0]
 
                     # 4. Crear Archivos (FormulaFile)
+                    dest_user_folder = os.path.join(
+                        working_dir, "uploads", f"user_{current_user.id}", f"dataset_{seeded_dataset.id}"
+                    )
+                    os.makedirs(dest_user_folder, exist_ok=True)  # Aseguramos que la carpeta de uploads exista
+
                     for csv_file in team_csv_files:
                         src_path = os.path.join(formula_src_folder, csv_file)
-                        dest_path = os.path.join(dest_formula_dir, csv_file)
+                        dest_path = os.path.join(dest_user_folder, csv_file)  # <-- Copiar a UPLOADS
 
-                        if not os.path.exists(dest_path):
+                        # Copiar y obtener tamaño
+                        if os.path.exists(src_path):
                             shutil.copy(src_path, dest_path)
+                            file_size = os.path.getsize(dest_path)
+                        else:
+                            # Si el archivo fuente no existe, loguear un error y usar tamaño 0
+                            print(f"⚠️ ERROR: Archivo fuente no encontrado: {src_path}")
+                            file_size = 0
 
-                        f_file = FormulaFile(
-                            name=csv_file, size=os.path.getsize(dest_path), formula_dataset_id=seeded_dataset.id
-                        )
+                        # Crear el registro de DB (FormulaFile)
+                        f_file = FormulaFile(name=csv_file, size=file_size, formula_dataset_id=seeded_dataset.id)
                         self.seed([f_file])

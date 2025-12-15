@@ -11,7 +11,7 @@ from flask_login import current_user, login_required
 
 from app import db
 from app.modules.dataset import dataset_bp
-from app.modules.dataset.forms import DataSetForm, FormulaDataSetForm, RawDataSetForm
+from app.modules.dataset.forms import DataSetForm, FormulaDataSetForm
 from app.modules.dataset.models import DataSet, DSDownloadRecord, FormulaFile
 from app.modules.dataset.services import (
     AuthorService,
@@ -21,7 +21,6 @@ from app.modules.dataset.services import (
     DSMetaDataService,
     DSViewRecordService,
     FormulaDataSetService,
-    RawDataSetService,
     UVLDataSetService,
 )
 from app.modules.fakenodo.services import FakenodoService
@@ -63,15 +62,14 @@ def create_dataset(dataset_type):
         form = FormulaDataSetForm()
         template = "dataset/upload_formula.html"
 
-    elif dataset_type == "raw":
-        service = RawDataSetService()
-        form = RawDataSetForm()
-        template = "dataset/upload_raw.html"
-
     else:
         return abort(404, description=f"Dataset type '{dataset_type}' not supported yet.")
 
     if request.method == "POST":
+
+        # Bandera para saber si la solicitud fue hecha por JavaScript/AJAX (Dropzone o Fetch)
+        is_ajax_request = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+
         if form.validate_on_submit():
             try:
                 # 1. Creación del dataset local
@@ -85,25 +83,21 @@ def create_dataset(dataset_type):
                 try:
                     logger.info("Connecting to Fakenodo (Mock)...")
 
-                    # Lógica específica de movimiento de ficheros (Solo para UVL)
                     if dataset_type == "uvl":
                         service.move_feature_models(dataset)
 
                     # A. Crear depósito en Fakenodo
-                    # Usamos el título del formulario
                     fake_meta = {"title": dataset.ds_meta_data.title}
                     deposition = fakenodo_service.create_deposition(metadata=fake_meta)
                     deposition_id = deposition.get("id")
 
                     # B. Simular subida de archivos
-                    # Recorremos los modelos para 'fingir' que los subimos al mock
                     if dataset_type == "uvl":
                         for fm in dataset.feature_models:
                             for file in fm.files:
-                                # Subimos contenido dummy o real, para el mock basta el nombre
                                 fakenodo_service.upload_file(deposition_id, file.name, b"mock_content_for_speed")
                     else:
-                        for file in dataset.files:
+                        for file in dataset.files():
                             fakenodo_service.upload_file(deposition_id, file.name, b"mock_content_for_speed")
 
                     # C. Publicar en Fakenodo (Genera el DOI)
@@ -118,17 +112,26 @@ def create_dataset(dataset_type):
                     flash("Dataset uploaded and synced with Fakenodo!", "success")
 
                 except Exception as e:
-                    # Si falla Fakenodo, no borramos el dataset local, solo avisamos
                     logger.error(f"Error en Fakenodo: {e}")
                     flash("Dataset saved locally, but Fakenodo sync failed.", "warning")
 
-                return jsonify({"message": "Dataset created successfully!"}), 200
+                if is_ajax_request:
+                    return jsonify({"message": "Dataset created successfully!"}), 200
+                else:
+                    return redirect(url_for("dataset.list_dataset"))
 
             except Exception as exc:
                 logger.exception(f"Exception while create dataset: {exc}")
-                return jsonify({"message": f"General error: {str(exc)}"}), 500
+                if is_ajax_request:
+                    return jsonify({"message": f"General error: {str(exc)}"}), 500
+                else:
+                    flash(f"Error al crear el dataset: {str(exc)}", "danger")
+                    return render_template(template, form=form, error=str(exc)), 500
         else:
-            return jsonify({"message": "Form validation failed"}), 400
+            if is_ajax_request:
+                return jsonify({"message": "Form validation failed", "errors": form.errors}), 400
+            else:
+                return render_template(template, form=form), 400
 
     return render_template(template, form=form)
 
@@ -214,7 +217,7 @@ def delete():
 
 @dataset_bp.route("/dataset/download/<int:dataset_id>", methods=["GET"])
 def download_dataset(dataset_id):
-    # Usamos get_or_404 genérico. SQLalchemy nos devolverá la instancia hija correcta (UVLDataSet o RawDataSet)
+    # Usamos get_or_404 genérico. SQLalchemy nos devolverá la instancia hija correcta
     dataset = dataset_service.get_or_404(dataset_id)
 
     # Lógica de contador (Común)

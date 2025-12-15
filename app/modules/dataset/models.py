@@ -254,7 +254,7 @@ class FormulaDataSet(DataSet):
         """
         Lee el PRIMER CSV usando PANDAS y devuelve HTML.
         """
-        if not self.files_rel:  # OJO: Usar self.files_rel
+        if not self.files_rel:
             return "<p>No CSV files in this dataset.</p>"
 
         first_file = self.files_rel[0]

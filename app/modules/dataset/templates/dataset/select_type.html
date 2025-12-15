@@ -12,7 +12,7 @@
         <div class="card h-100 text-center hover-shadow">
             <div class="card-body py-5">
                 <div class="mb-3 text-primary">
-                    <i data-feather="upload-cloud" style="width: 48px; height: 48px;"></i>
+                    <i data-feather="upload-cloud" style="width: 72px; height: 72px;"></i>
                 </div>
                 <h3 class="card-title">UVL Models</h3>
                 <p class="card-text text-muted">Upload Feature Models in .uvl format with automatic parsing and validation.</p>
@@ -25,24 +25,11 @@
         <div class="card h-100 text-center hover-shadow">
             <div class="card-body py-5">
                 <div class="mb-3 text-danger">
-                    <i data-feather="activity" style="width: 48px; height: 48px;"></i>
+                    <i data-feather="activity" style="width: 72px; height: 72px;"></i>
                 </div>
                 <h3 class="card-title">Formula 1</h3>
                 <p class="card-text text-muted">Upload CSV telemetry data, tyre strategies and race statistics.</p>
                 <a href="{{ url_for('dataset.create_dataset', dataset_type='formula') }}" class="btn btn-outline-danger stretched-link">Select Formula</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-4">
-        <div class="card h-100 text-center hover-shadow">
-            <div class="card-body py-5">
-                <div class="mb-3 text-success">
-                    <i data-feather="file-text" style="width: 48px; height: 48px;"></i>
-                </div>
-                <h3 class="card-title">Raw Dataset</h3>
-                <p class="card-text text-muted">Upload any other type of raw data (JSON, XML, JPG, PNG, etc.) without parsing.</p>
-                <a href="{{ url_for('dataset.create_dataset', dataset_type='raw') }}" class="btn btn-outline-success stretched-link">Select Raw</a>
             </div>
         </div>
     </div>
