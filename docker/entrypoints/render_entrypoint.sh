@@ -17,6 +17,7 @@ echo "🚀 Iniciando despliegue en Render..."
 # - Si hay tablas viejas -> Las actualiza.
 # - Si está al día -> No hace nada.
 echo "🔄 Ejecutando migraciones de base de datos..."
+rosemary db:reset
 flask db upgrade
 
 # ---------------------------------------------------------------------------
