@@ -6,9 +6,6 @@
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=for-the-badge)
 ![CI/CD](https://img.shields.io/badge/CI%2FCD-Active-success?style=for-the-badge&logo=github-actions)
 
-> **Repositorio de datasets de fórmula 1**
-> Plataforma web para almacenar, compartir y gestionar datasets de propiedades de fórmula 1.
-
 <p align="center">
   </p>
 
@@ -26,7 +23,7 @@
 
 ## ✨ Características
 
-- 📊 **Gestión de Datasets de Fórmula**: Almacenamiento estructurado dataset de fórmula 1 (UVL, CSV).
+- 📊 **Gestión de Datasets**: Almacenamiento estructurado datasets (UVL, CSV).
 - 👥 **Gestión de Usuarios**: Sistema completo de autenticación y perfiles de usuario.
 - 🌐 **Integración Zenodo**: Publicación directa de datasets con generación de DOI.
 - 🧪 **Testing Completo**: Suite robusta de tests unitarios, de integración y E2E.
@@ -75,6 +72,7 @@ venv\Scripts\activate
 
 ```bash
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### 4\. Configurar Variables de Entorno
@@ -113,7 +111,7 @@ CREATE DATABASE uvlhubdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 Luego, utiliza nuestro CLI Rosemary para configurar las tablas y poblar datos:
 
 ```bash
-flask db:upgrade
+flask db upgrade
 rosemary db:seed
 ```
 
@@ -144,19 +142,13 @@ Utilizamos `rosemary`, nuestro CLI personalizado, para gestionar el proyecto.
 ### 🧪 Testing & Calidad
 
 ```bash
-# Tests completos (Pytest)
-pytest -v
-
 # Tests por tipo
-pytest -m unit -v        # Unitarios
-pytest -m integration -v # Integración
+rosemary test       # Unitarios
+rosemary selenium   # Interfaz
+rosemary locust     # Carga
 
 # Reporte de cobertura
-pytest --cov=app --cov-report=html
-
-# Tests de carga (Locust)
-locust --host=http://localhost:5000
-
+rosemary coverage
 ```
 
 ### 🛠️ Generadores y Utilidades
