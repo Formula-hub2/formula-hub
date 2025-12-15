@@ -199,29 +199,30 @@ var currentId = 0;
                     if (checked_orcid && checked_name) {
                         fetch('/dataset/upload', {
                             method: 'POST',
-                            body: formUploadData
+                            body: formUploadData,
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
                         })
-                            .then(response => {
-                                if (response.ok) {
-                                    console.log('Dataset sent successfully');
-                                    response.json().then(data => {
-                                        console.log(data.message);
+                        .then(response => {
+                            if (response.ok) {
+                                response.json().then(data => {
+                                    console.log("Success:", data);
+                                    if (data.redirect_url) {
+                                        window.location.href = data.redirect_url;
+                                    } else {
                                         window.location.href = "/dataset/list";
-                                    });
-                                } else {
-                                    response.json().then(data => {
-                                        console.error('Error: ' + data.message);
-                                        hide_loading();
-
-                                        write_upload_error(data.message);
-
-                                    });
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error in POST request:', error);
-                            });
-                    }
+                                    }
+                                });
+                            } else {
+                                response.json().then(data => {
+                                    console.error('Error: ' + data.message);
+                                    hide_loading();
+                                    write_upload_error(data.message);
+                                });
+                            }
+                        })                    }
 
 
                 } else {

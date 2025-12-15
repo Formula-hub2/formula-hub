@@ -30,9 +30,9 @@ class TestDatasetLifecycle:
                 db.session.delete(ds)
             db.session.commit()
 
-    def test_full_lifecycle(self):
+    def test_upload_uvl_dataset(self):
         driver = self.driver
-        dataset_title = "Selenium Test Dataset"
+        dataset_title = "Selenium Test Dataset UVL"
 
         base_path = os.path.abspath(os.getcwd())
         file_path = os.path.join(base_path, "prueba_test.uvl")
@@ -89,6 +89,58 @@ class TestDatasetLifecycle:
             driver.get(f"{self.host}/dataset/list")
 
             self.wait.until(EC.text_to_be_present_in_element((By.TAG_NAME, "body"), dataset_title))
+
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+    def test_upload_formula_dataset(self):
+        driver = self.driver
+        dataset_title = "Selenium Test Dataset Formula"
+
+        base_path = os.path.abspath(os.getcwd())
+        file_path = os.path.join(base_path, "prueba_test.csv")
+
+        try:
+            # Crear archivo dummy
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write("speed,rpm,gear\n200,11000,7\n210,11500,7")
+
+            # 1. LOGIN
+            driver.get(f"{self.host}/login")
+
+            email_field = self.wait.until(EC.visibility_of_element_located((By.NAME, "email")))
+            password_field = driver.find_element(By.NAME, "password")
+
+            email_field.send_keys("user2@example.com")
+            password_field.send_keys("1234")
+            password_field.send_keys(Keys.RETURN)
+
+            self.wait.until(EC.presence_of_element_located((By.XPATH, "//h1[contains(., 'Latest datasets')]")))
+
+            # 2. IR A SUBIDA FORMULA
+            driver.get(f"{self.host}/dataset/upload/formula")
+
+            # 3. RELLENAR FORMULARIO
+            title_field = self.wait.until(EC.visibility_of_element_located((By.NAME, "title")))
+            title_field.send_keys(dataset_title)
+
+            driver.find_element(By.NAME, "desc").send_keys("Description formula test")
+            driver.find_element(By.NAME, "tags").send_keys("selenium, formula")
+
+            # 4. SUBIR CSV
+            file_input = driver.find_element(By.ID, "csv_file")
+            file_input.send_keys(file_path)
+
+            # 5. CHECKBOX Y SUBMIT
+            agree_checkbox = driver.find_element(By.ID, "agreeCheckbox")
+            driver.execute_script("arguments[0].click();", agree_checkbox)
+
+            upload_btn = driver.find_element(By.ID, "upload_button")
+            driver.execute_script("arguments[0].click();", upload_btn)
+
+            # 6. VERIFICAR REDIRECCIÓN Y CREACIÓN
+            self.wait.until(EC.url_contains("/dataset/list"))
 
         finally:
             if os.path.exists(file_path):

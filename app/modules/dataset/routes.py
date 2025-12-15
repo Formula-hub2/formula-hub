@@ -67,9 +67,6 @@ def create_dataset(dataset_type):
 
     if request.method == "POST":
 
-        # Bandera para saber si la solicitud fue hecha por JavaScript/AJAX (Dropzone o Fetch)
-        is_ajax_request = request.headers.get("X-Requested-With") == "XMLHttpRequest"
-
         if form.validate_on_submit():
             try:
                 # 1. Creación del dataset local
@@ -78,7 +75,7 @@ def create_dataset(dataset_type):
                 logger.info(f"Created dataset: {dataset}")
 
                 # =======================================================
-                # BLOQUE MODIFICADO: CONEXIÓN A FAKENODO (Mock)
+                # BLOQUE CONEXIÓN A FAKENODO (Mock)
                 # =======================================================
                 try:
                     logger.info("Connecting to Fakenodo (Mock)...")
@@ -115,23 +112,37 @@ def create_dataset(dataset_type):
                     logger.error(f"Error en Fakenodo: {e}")
                     flash("Dataset saved locally, but Fakenodo sync failed.", "warning")
 
-                if is_ajax_request:
-                    return jsonify({"message": "Dataset created successfully!"}), 200
-                else:
-                    return redirect(url_for("dataset.list_dataset"))
+                # Si la petición es JSON (viene del fetch de scripts.js), devolvemos JSON
+                if request.accept_mimetypes.best == "application/json" or request.is_json:
+                    return (
+                        jsonify(
+                            {
+                                "message": "Dataset uploaded successfully",
+                                "redirect_url": url_for("dataset.list_dataset"),
+                            }
+                        ),
+                        200,
+                    )
+
+                # Si es una petición normal de navegador (fallback), redirección estándar
+                return redirect(url_for("dataset.list_dataset"))
 
             except Exception as exc:
                 logger.exception(f"Exception while create dataset: {exc}")
-                if is_ajax_request:
-                    return jsonify({"message": f"General error: {str(exc)}"}), 500
-                else:
-                    flash(f"Error al crear el dataset: {str(exc)}", "danger")
-                    return render_template(template, form=form, error=str(exc)), 500
+                flash(f"Error al crear el dataset: {str(exc)}", "danger")
+
+                # Si falla y era una petición JSON, devolvemos error JSON 500
+                if request.accept_mimetypes.best == "application/json" or request.is_json:
+                    return jsonify({"message": str(exc)}), 500
+
+                return render_template(template, form=form, error=str(exc)), 500
         else:
-            if is_ajax_request:
-                return jsonify({"message": "Form validation failed", "errors": form.errors}), 400
-            else:
-                return render_template(template, form=form), 400
+            # Si el formulario no es válido
+            errors = form.errors
+            if request.accept_mimetypes.best == "application/json" or request.is_json:
+                return jsonify({"message": "Form validation failed", "errors": errors}), 400
+
+            return render_template(template, form=form), 400
 
     return render_template(template, form=form)
 

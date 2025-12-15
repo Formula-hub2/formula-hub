@@ -1,3 +1,4 @@
+import io
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -5,9 +6,11 @@ from sqlalchemy import text
 
 from app import db
 from app.modules.auth.models import User
+from app.modules.conftest import login
 from app.modules.dataset.forms import DataSetForm
 from app.modules.dataset.models import DataSet, DSDownloadRecord, DSMetaData, PublicationType, RawDataSet, UVLDataSet
 from app.modules.dataset.services import DataSetService, RawDataSetService, UVLDataSetService
+from app.modules.profile.models import UserProfile
 
 
 @pytest.fixture(scope="module")
@@ -551,3 +554,97 @@ def test_uvlhub_doi_generation(test_client):
         url = service.get_uvlhub_doi(mock_ds)
 
         assert "/fakenodo/visualize/1" in url
+
+
+def test_create_formula_dataset_route(test_client):
+    """
+    Prueba la ruta de creación específica para Formula 1 (CSV).
+    """
+    login(test_client, "test@example.com", "test1234")
+
+    # --- ARREGLO 1: Asegurar que el usuario tiene perfil ---
+    with test_client.application.app_context():
+        user = User.query.filter_by(email="test@example.com").first()
+        if user and not user.profile:
+            profile = UserProfile(user_id=user.id, name="Test", surname="User", affiliation="Test Lab")
+            db.session.add(profile)
+            db.session.commit()
+    # -------------------------------------------------------
+
+    # Simulamos un archivo CSV
+    csv_content = b"col1,col2\nval1,val2"
+    data = {
+        "title": "Formula Test Unit",
+        "desc": "Description for formula test",
+        "publication_type": "report",
+        "tags": "f1, telemetry",
+        "csv_file": (io.BytesIO(csv_content), "telemetry.csv"),
+    }
+
+    response = test_client.post(
+        "/dataset/upload/formula", data=data, follow_redirects=True, content_type="multipart/form-data"
+    )
+
+    assert response.status_code == 200
+    # Verificamos que se haya creado un dataset tipo formula
+    ds = DataSet.query.join(DSMetaData).filter(DSMetaData.title == "Formula Test Unit").first()
+    assert ds is not None
+    assert ds.dataset_type == "formula_dataset"
+
+
+def test_csv_preview_route(test_client):
+    """
+    Prueba la previsualización de datos (Pandas).
+    """
+    login(test_client, "test@example.com", "test1234")
+
+    with test_client.application.app_context():
+        user = User.query.filter_by(email="test@example.com").first()
+        if user and not user.profile:
+            profile = UserProfile(user_id=user.id, name="Test", surname="User", affiliation="Test Lab")
+            db.session.add(profile)
+            db.session.commit()
+
+    csv_content = b"speed,rpm\n100,5000\n120,6000"
+    data = {
+        "title": "Preview Test",
+        "desc": "Desc",
+        "publication_type": "none",
+        "tags": "test",
+        "csv_file": (io.BytesIO(csv_content), "preview.csv"),
+    }
+    test_client.post("/dataset/upload/formula", data=data, follow_redirects=True, content_type="multipart/form-data")
+
+    ds = DataSet.query.join(DSMetaData).filter(DSMetaData.title == "Preview Test").first()
+
+    assert ds is not None
+    files = ds.files()
+    assert len(files) > 0
+    file_id = files[0].id
+
+    response = test_client.get(f"/dataset/formula/file_preview/{file_id}")
+
+    assert response.status_code == 200
+    assert "content" in response.json
+    assert "5000" in response.json["content"]
+
+
+def test_duplicate_dataset_route(test_client):
+    """
+    Prueba la funcionalidad de duplicar dataset.
+    """
+    login(test_client, "test@example.com", "test1234")
+
+    ds = DataSet.query.first()
+    if not ds:
+        return
+
+    original_count = DataSet.query.count()
+
+    response = test_client.post(f"/dataset/{ds.id}/duplicate", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert DataSet.query.count() == original_count + 1
+
+    latest = DataSet.query.order_by(DataSet.id.desc()).first()
+    assert "Copy of" in latest.ds_meta_data.title
