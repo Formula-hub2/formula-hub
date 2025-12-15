@@ -28,10 +28,10 @@ echo "🌱 Poblando la base de datos (Seeding)..."
 # Usamos una lógica robusta: si el comando 'rosemary' no está en el PATH,
 # lo ejecutamos a través de Python, que es más seguro en Docker.
 if command -v rosemary &> /dev/null; then
-    rosemary db:seed || echo "⚠️ El seeding falló (probablemente datos ya existentes). Continuando..."
+    rosemary db:seed
 else
     echo "⚠️ Comando CLI 'rosemary' no detectado. Ejecutando vía módulo Python..."
-    python -m rosemary db:seed || echo "⚠️ El seeding falló (probablemente datos ya existentes). Continuando..."
+    python -m rosemary db:seed
 fi
 
 # ---------------------------------------------------------------------------
