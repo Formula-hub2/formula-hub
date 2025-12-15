@@ -4,18 +4,6 @@ from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
-from app.modules.auth.models import User
-from app.modules.dataset.models import (
-    Author,
-    DSMetaData,
-    DSMetrics,
-    FormulaDataSet,
-    FormulaFile,
-    PublicationType,
-    UVLDataSet,
-)
-from app.modules.featuremodel.models import FeatureModel, FMMetaData
-from app.modules.hubfile.models import Hubfile
 from core.seeders.BaseSeeder import BaseSeeder
 
 
@@ -24,6 +12,19 @@ class DataSetSeeder(BaseSeeder):
     priority = 2  # Lower priority
 
     def run(self):
+        from app.modules.auth.models import User
+        from app.modules.dataset.models import (
+            Author,
+            DSMetaData,
+            DSMetrics,
+            FormulaDataSet,
+            FormulaFile,
+            PublicationType,
+            UVLDataSet,
+        )
+        from app.modules.featuremodel.models import FeatureModel, FMMetaData
+        from app.modules.hubfile.models import Hubfile
+
         # Retrieve users
         user1 = User.query.filter_by(email="user1@example.com").first()
         user2 = User.query.filter_by(email="user2@example.com").first()
