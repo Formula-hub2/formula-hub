@@ -231,7 +231,7 @@ def test_login_brute_force_limit(test_client, clean_database):
         name="Test", surname="Example", email="test@example.com", password="test1234"
     )
 
-    for i in range(5):
+    for i in range(6):
         response = test_client.post(
             "/login", data=dict(email="test@example.com", password=f"wrong_pass_{i}"), follow_redirects=True
         )
