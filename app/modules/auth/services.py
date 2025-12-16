@@ -219,7 +219,7 @@ class AuthenticationService(BaseService):
         self.repository.session.commit()
 
     def get_remaining_seconds(self, user):
-        if user.failed_login_attempts >= 5 and user.last_failed_login:
+        if user.failed_login_attempts >= 6 and user.last_failed_login:
             time_since_fail = datetime.utcnow() - user.last_failed_login
 
             if time_since_fail < timedelta(seconds=60):

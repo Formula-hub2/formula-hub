@@ -30,10 +30,10 @@ class UserRepository(BaseRepository):
         if user.failed_login_attempts is None:
             return False
 
-        if user.failed_login_attempts < 5:
+        if user.failed_login_attempts < 6:
             return False
 
-        if user.failed_login_attempts >= 5:
+        if user.failed_login_attempts >= 6:
             if user.last_failed_login:
                 time_since_last_fail = datetime.utcnow() - user.last_failed_login
 
